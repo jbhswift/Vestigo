@@ -10,6 +10,7 @@ extension VestigoModel {
             AnalyticsService.shared.track(.itemAdded(mediaType: item.kind.rawValue, action: "watchlist"))
         }
         saveLocalSoon()
+        schedulePublicProfilePublish()
     }
 
     func toggleWatched(_ item: MediaItem, showsRatingPrompt: Bool = true) {
@@ -55,6 +56,7 @@ extension VestigoModel {
             generateDynamicCollections(from: item)
         }
         saveLocalSoon()
+        schedulePublicProfilePublish()
 
         if isNowWatched {
             let cachedCollectionIDs = Array(collectionRecommendations.keys)
