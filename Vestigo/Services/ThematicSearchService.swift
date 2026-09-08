@@ -85,6 +85,7 @@ struct ThematicSearchService {
         req.httpBody = try JSONEncoder().encode(Body(query: rawQuery, filter: filterParam))
 
         let (data, response) = try await URLSession.shared.data(for: req)
+        AnalyticsService.shared.track(.apiCallMade(service: "openrouter"))
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
             let message: String

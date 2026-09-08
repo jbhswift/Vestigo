@@ -1,3 +1,19 @@
+// Fire-and-forget PostHog tracking for backend API calls
+function trackApiCall(service: string): void {
+  const apiKey = Deno.env.get("POSTHOG_API_KEY")
+  if (!apiKey) return
+  fetch("https://us.posthog.com/capture/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key: apiKey,
+      event: "backend_api_call",
+      properties: { service, distinct_id: "backend", source: "supabase" },
+      timestamp: new Date().toISOString(),
+    }),
+  }).catch(() => {})
+}
+
 function normalizeAMCFormat(raw: string | null): string | null {
   if (!raw) return null
   const s = raw.toLowerCase()
@@ -130,6 +146,7 @@ async function fetchTMDb(path: string, params: Record<string, string> = {}) {
     throw new Error(`TMDb request failed: ${response.status} ${text}`)
   }
 
+  trackApiCall("tmdb")
   return await response.json()
 }
 
@@ -345,6 +362,7 @@ async function fetchWatchmode(path: string, params: Record<string, string> = {})
     throw new Error(`Watchmode request failed: ${response.status} ${text}`)
   }
 
+  trackApiCall("watchmode")
   return await response.json()
 }
 
@@ -822,6 +840,7 @@ async function fetchTVDB(path: string, token: string) {
     throw new Error(`TVDB request failed ${path}: ${response.status} ${text}`)
   }
 
+  trackApiCall("tvdb")
   const json = await response.json()
   return json.data
 }
@@ -1551,6 +1570,7 @@ Deno.serve(async (req) => {
         return Response.json({ ok: false, error: `AMC API error: ${amcResp.status}`, amcBody: errBody }, { status: 502 })
       }
 
+      trackApiCall("amc")
       const amcData = await amcResp.json()
 
       // Pass ?debug=1 to see the raw AMC response for response shape diagnosis
@@ -1743,6 +1763,7 @@ Rules:
         return true
       })
 
+      trackApiCall("openrouter")
       await incrementAIUsage()
       return Response.json({ ok: true, titles })
     }
@@ -1824,6 +1845,7 @@ Rules:
       }
 
       const rankings = Array.isArray(rerankParsed?.rankings) ? rerankParsed.rankings : []
+      trackApiCall("openrouter")
       await incrementAIUsage()
       return Response.json({ ok: true, rankings })
     }
@@ -1905,6 +1927,7 @@ Rules:
         return Response.json({ ok: false, error: "Failed to parse AI response as JSON", raw: text }, { status: 502 })
       }
 
+      trackApiCall("openrouter")
       await incrementAIUsage()
       return Response.json({ ok: true, ...parsed })
     }

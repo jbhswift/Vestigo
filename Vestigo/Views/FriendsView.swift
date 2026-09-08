@@ -24,6 +24,18 @@ struct FriendProfile: Identifiable, Hashable, Codable {
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: FriendProfile, rhs: FriendProfile) -> Bool { lhs.id == rhs.id }
+
+    /// The item they most recently watched, using watchedDates to find the latest rather than
+    /// relying on array order (items without dates sort to the back during publish, so .first
+    /// can be an old dated item while a newer undated item sits at the end).
+    var mostRecentlyWatchedItem: MediaItem? {
+        guard !watchedItems.isEmpty else { return nil }
+        if let latestSID = watchedDates.max(by: { $0.value < $1.value })?.key,
+           let item = watchedItems.first(where: { $0.key.stableID == latestSID }) {
+            return item
+        }
+        return watchedItems.first
+    }
 }
 
 enum FriendsRoute: Hashable {

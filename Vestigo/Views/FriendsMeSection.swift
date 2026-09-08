@@ -54,7 +54,7 @@ struct MeSectionView: View {
         model.friends
             .filter { $0.sharesWatched && !$0.watchedItems.isEmpty }
             .compactMap { friend in
-                guard let item = friend.watchedItems.first else { return nil }
+                guard let item = friend.mostRecentlyWatchedItem else { return nil }
                 return ActivityEntry(friend: friend, item: item)
             }
             .sorted { a, b in

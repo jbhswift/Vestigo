@@ -93,6 +93,10 @@ struct ContentView: View {
             model.refreshImages()
         })
         .task { await model.bootstrap() }
+        .onChange(of: model.settings.socialMyRecordName) { _, recordName in
+            guard !recordName.isEmpty else { return }
+            AnalyticsService.shared.identify(cloudKitID: recordName, name: model.settings.name)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .vestigoShortcut)) { notification in
             if let type = notification.object as? String {
                 handleShortcut(type)

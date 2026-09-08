@@ -26,6 +26,7 @@ struct StreamingAvailabilityService {
     private func fetch<T: Decodable>(url: URL) async throws -> T {
         let request = URLRequest(url: url)
         let (data, response) = try await URLSession.shared.data(for: request)
+        AnalyticsService.shared.track(.apiCallMade(service: "watchmode"))
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             throw URLError(.badServerResponse)
         }

@@ -24,6 +24,7 @@ struct RelatedMediaService {
         request.setValue("application/sparql-results+json", forHTTPHeaderField: "Accept")
 
         let (data, response) = try await URLSession.shared.data(for: request)
+        AnalyticsService.shared.track(.apiCallMade(service: "wikidata"))
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             throw URLError(.badServerResponse)
         }
@@ -48,6 +49,7 @@ struct RelatedMediaService {
         request.setValue("application/sparql-results+json", forHTTPHeaderField: "Accept")
 
         let (data, response) = try await URLSession.shared.data(for: request)
+        AnalyticsService.shared.track(.apiCallMade(service: "wikidata"))
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             return []
         }

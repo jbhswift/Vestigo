@@ -50,6 +50,7 @@ enum AMCShowtimesService {
         guard let url = comps?.url else { return .failed }
         do {
             let (data, response) = try await URLSession.shared.data(for: URLRequest(url: url))
+            AnalyticsService.shared.track(.apiCallMade(service: "amc"))
             if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
                 return .failed
             }

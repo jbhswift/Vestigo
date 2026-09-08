@@ -35,7 +35,9 @@ extension VestigoModel {
             "context": ["client": ["clientName": "ANDROID", "clientVersion": "17.31.35", "androidSdkVersion": 30]]
         ])
         guard let (data, _) = try? await URLSession.shared.data(for: request),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              { AnalyticsService.shared.track(.apiCallMade(service: "youtube")); return true }()
+        else { return false }
         // Canonical URL is definitive — YouTube sets /shorts/ for Shorts, /watch?v= for everything else
         if let microformat = json["microformat"] as? [String: Any],
            let renderer = microformat["playerMicroformatRenderer"] as? [String: Any],
@@ -381,8 +383,25 @@ extension VestigoModel {
         }
         settings.omdbDailyRequestCount += 1
         settings.omdbTotalRequestCount += 1
+        AnalyticsService.shared.track(.externalRatingFetched)
         if settings.omdbDailyRequestCount >= settings.omdbTierLimit {
             showOMDbLimitAlert = true
+        }
+        // Sync usage to Supabase every 10 requests so the dashboard has fresh data
+        if settings.omdbDailyRequestCount % 10 == 0 {
+            reportOMDbUsageToSupabase()
+        }
+    }
+
+    private func reportOMDbUsageToSupabase() {
+        let daily = settings.omdbDailyRequestCount
+        let total = settings.omdbTotalRequestCount
+        let limit = settings.omdbTierLimit
+        let date = Calendar.current.startOfDay(for: Date())
+        let dateStr = ISO8601DateFormatter().string(from: date).prefix(10).description
+
+        Task {
+            await backend.reportOMDbUsage(date: dateStr, dailyCount: daily, totalCount: total, dailyLimit: limit)
         }
     }
 

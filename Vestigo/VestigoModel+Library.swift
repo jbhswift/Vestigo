@@ -4,7 +4,11 @@ import Foundation
 extension VestigoModel {
 
     func toggleWatchlist(_ item: MediaItem) {
+        let wasInWatchlist = library.isInWatchlist(item.key)
         library.toggleWatchlist(item)
+        if !wasInWatchlist {
+            AnalyticsService.shared.track(.itemAdded(mediaType: item.kind.rawValue, action: "watchlist"))
+        }
         saveLocalSoon()
     }
 
@@ -24,6 +28,10 @@ extension VestigoModel {
         }
 
         let isNowWatched = library.isWatched(item.key)
+
+        if !wasWatched, isNowWatched {
+            AnalyticsService.shared.track(.itemAdded(mediaType: item.kind.rawValue, action: "watched"))
+        }
 
         // If the item was watched and is now unwatched, remove it from all collections and clear collection recommendations
         if wasWatched, !isNowWatched {

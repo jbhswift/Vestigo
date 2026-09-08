@@ -15,9 +15,12 @@ enum AnalyticsEvent {
     case itemAdded(mediaType: String, action: String)
     case itemRated(rating: Double)
     case friendAdded
+    case friendProfileViewed
+    case collectionBrowsed
     case trailerOpened
     case streamingChecked
     case externalRatingFetched
+    case apiCallMade(service: String)
 }
 
 private extension AnalyticsEvent {
@@ -43,12 +46,18 @@ private extension AnalyticsEvent {
             return ("item_rated", ["rating": rating])
         case .friendAdded:
             return ("friend_added", nil)
+        case .friendProfileViewed:
+            return ("friend_profile_viewed", nil)
+        case .collectionBrowsed:
+            return ("collection_browsed", nil)
         case .trailerOpened:
             return ("trailer_opened", nil)
         case .streamingChecked:
             return ("streaming_checked", nil)
         case .externalRatingFetched:
             return ("external_rating_fetched", nil)
+        case .apiCallMade(let service):
+            return ("api_call", ["service": service])
         }
     }
 }
@@ -68,32 +77,61 @@ final class AnalyticsService: @unchecked Sendable {
     static let shared = AnalyticsService()
     private init() {}
 
+    // Events that arrive before PostHog is ready are queued and flushed on init.
+    private let lock = NSLock()
+    private var isReady = false
+    private var pendingEvents: [(name: String, props: [String: Any]?)] = []
+
     private var isTestFlight: Bool {
         Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
     }
 
-    // Fires a Task to fetch keys from Supabase secrets, then initialises SDKs.
-    // Called synchronously from AppDelegate — the Task completes within a few
-    // hundred ms, well before the user interacts with any feature that tracks.
+    private var isSimulator: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return false
+        #endif
+    }
+
     func setup() {
+        guard !isSimulator else {
+            print("[Analytics] Simulator detected — analytics disabled")
+            return
+        }
         Task { await fetchConfigAndSetup() }
     }
 
     private func fetchConfigAndSetup() async {
-        // Derive the config URL from the same Supabase project as the backend
-        let supabaseBase = VestigoBackendConfiguration.baseURL
-            .deletingLastPathComponent() // strip "vestigo-api"
+        let supabaseBase = VestigoBackendConfiguration.baseURL.deletingLastPathComponent()
         let configURL = supabaseBase.appending(path: "get-app-config")
 
-        guard let (data, response) = try? await URLSession.shared.data(from: configURL),
-              (response as? HTTPURLResponse)?.statusCode == 200,
-              let config = try? JSONDecoder().decode(AppRemoteConfig.self, from: data),
-              config.ok,
-              !config.posthogKey.isEmpty
-        else { return }
+        print("[Analytics] Fetching config from \(configURL)")
 
-        setupPostHog(key: config.posthogKey, host: config.posthogHost)
-        setupSentry(dsn: config.sentryDsn)
+        do {
+            let (data, response) = try await URLSession.shared.data(from: configURL)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            print("[Analytics] Config response status: \(status)")
+
+            guard status == 200 else {
+                print("[Analytics] Bad status — events will not be tracked")
+                return
+            }
+
+            let config = try JSONDecoder().decode(AppRemoteConfig.self, from: data)
+            guard config.ok, !config.posthogKey.isEmpty else {
+                print("[Analytics] Config ok=\(config.ok) key=\(config.posthogKey.isEmpty ? "EMPTY" : "set") — aborting")
+                return
+            }
+
+            print("[Analytics] Config loaded. Setting up PostHog + Sentry.")
+            setupPostHog(key: config.posthogKey, host: config.posthogHost)
+            setupSentry(dsn: config.sentryDsn)
+            flushPendingEvents()
+
+        } catch {
+            print("[Analytics] Config fetch failed: \(error)")
+        }
     }
 
     private func setupPostHog(key: String, host: String) {
@@ -105,6 +143,7 @@ final class AnalyticsService: @unchecked Sendable {
             "distribution": isTestFlight ? "testflight" : "appstore",
             "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
         ])
+        print("[Analytics] PostHog ready ✓")
     }
 
     private func setupSentry(dsn: String) {
@@ -114,6 +153,20 @@ final class AnalyticsService: @unchecked Sendable {
             options.tracesSampleRate = 0.1
             options.environment = self.isTestFlight ? "testflight" : "production"
             options.attachViewHierarchy = false
+        }
+        print("[Analytics] Sentry ready ✓")
+    }
+
+    private func flushPendingEvents() {
+        lock.lock()
+        let events = pendingEvents
+        pendingEvents.removeAll()
+        isReady = true
+        lock.unlock()
+
+        print("[Analytics] Flushing \(events.count) queued event(s)")
+        for (name, props) in events {
+            PostHogSDK.shared.capture(name, properties: props)
         }
     }
 
@@ -127,7 +180,14 @@ final class AnalyticsService: @unchecked Sendable {
 
     func track(_ event: AnalyticsEvent) {
         let (name, props) = event.payload
-        PostHogSDK.shared.capture(name, properties: props)
+        lock.lock()
+        if isReady {
+            lock.unlock()
+            PostHogSDK.shared.capture(name, properties: props)
+        } else {
+            pendingEvents.append((name: name, props: props))
+            lock.unlock()
+        }
     }
 
     func captureError(_ error: Error, context: [String: Any] = [:]) {

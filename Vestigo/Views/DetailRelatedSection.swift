@@ -70,6 +70,7 @@ struct RelatedMediaCard: View {
               let summaryURL = URL(string: "https://en.wikipedia.org/api/rest_v1/page/summary/\(title)") else { return nil }
 
         guard let (data, _) = try? await URLSession.shared.data(from: summaryURL) else { return nil }
+        AnalyticsService.shared.track(.apiCallMade(service: "wikipedia"))
 
         struct WikiSummary: Decodable {
             struct Thumbnail: Decodable { let source: String }

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { SignJWT, importPKCS8 } from 'jose'
+
+export const dynamic = 'force-dynamic'
 
 const POSTHOG_HOST = process.env.POSTHOG_HOST ?? 'https://us.posthog.com'
 const PROJECT_ID = process.env.POSTHOG_PROJECT_ID!
@@ -17,9 +20,108 @@ const FEATURE_LABELS: Record<string, string> = {
   item_added: 'Items Added',
   item_rated: 'Ratings Given',
   friend_added: 'Friends Added',
+  friend_profile_viewed: 'Friend Profile Views',
+  collection_browsed: 'Collections Browsed',
   trailer_opened: 'Trailers Opened',
   streaming_checked: 'Streaming Checked',
   external_rating_fetched: 'Ratings Fetched (OMDb)',
+}
+
+interface AppleStats {
+  totalTesters: number | null
+  emailTesters: number | null
+  publicLinkTesters: number | null
+  totalBuilds: number | null
+  externalGroupName: string | null
+  publicLink: string | null
+  publicLinkEnabled: boolean | null
+  debugError?: string
+}
+
+function normalizePem(raw: string): string {
+  const pem = raw.replace(/\\n/g, '\n').replace(/\\r/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+  const header = (pem.match(/-----BEGIN[^-]+-----/) ?? [])[0] ?? '-----BEGIN PRIVATE KEY-----'
+  const footer = (pem.match(/-----END[^-]+-----/) ?? [])[0] ?? '-----END PRIVATE KEY-----'
+  const body = pem.replace(/-----BEGIN[^-]+-----/, '').replace(/-----END[^-]+-----/, '').replace(/\s+/g, '')
+  const wrapped = (body.match(/.{1,64}/g) ?? []).join('\n')
+  return `${header}\n${wrapped}\n${footer}`
+}
+
+async function fetchAppleStats(): Promise<AppleStats | null> {
+  const issuerId = process.env.ASC_ISSUER_ID
+  const keyId = process.env.ASC_KEY_ID
+  const privateKeyPem = process.env.ASC_PRIVATE_KEY ? normalizePem(process.env.ASC_PRIVATE_KEY) : undefined
+  const appId = process.env.ASC_APP_ID
+  if (!issuerId || !keyId || !privateKeyPem || !appId) return null
+
+  try {
+    const privateKey = await importPKCS8(privateKeyPem, 'ES256')
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: 'ES256', kid: keyId })
+      .setIssuer(issuerId)
+      .setIssuedAt()
+      .setExpirationTime('20m')
+      .setAudience('appstoreconnect-v1')
+      .sign(privateKey)
+
+    const headers = { Authorization: `Bearer ${token}` }
+    const opts = { headers, next: { revalidate: 3600 } } as RequestInit
+
+    // Step 1: get groups and builds in parallel
+    const [buildsRes, groupsRes] = await Promise.all([
+      fetch(`https://api.appstoreconnect.apple.com/v1/builds?filter[app]=${appId}&limit=1`, opts),
+      fetch(`https://api.appstoreconnect.apple.com/v1/betaGroups?filter[app]=${appId}&fields[betaGroups]=name,isInternalGroup,publicLink,publicLinkEnabled`, opts),
+    ])
+
+    type GroupsPayload = { data?: { id: string; attributes: { name: string; isInternalGroup: boolean; publicLink?: string; publicLinkEnabled?: boolean } }[] }
+    let groupsData: GroupsPayload | null = null
+    let groupsDebugError: string | undefined
+    if (groupsRes.ok) {
+      groupsData = await groupsRes.json() as GroupsPayload
+    } else {
+      const body = await groupsRes.text().catch(() => '(unreadable)')
+      groupsDebugError = `betaGroups HTTP ${groupsRes.status}: ${body.slice(0, 300)}`
+    }
+
+    const buildsData = buildsRes.ok ? await buildsRes.json() : null
+
+    const groups = groupsData?.data ?? []
+    const externalGroup = groups.find((g) => !g.attributes.isInternalGroup)
+
+    // Step 2: count testers by total and invite type in parallel
+    let groupTesterCount: number | null = null
+    let emailTesterCount: number | null = null
+    let publicLinkTesterCount: number | null = null
+    if (externalGroup?.id) {
+      try {
+        const gid = externalGroup.id
+        const base = `https://api.appstoreconnect.apple.com/v1/betaTesters?filter[betaGroups]=${gid}&limit=1`
+        const [totalRes, emailRes, plRes] = await Promise.all([
+          fetch(base, opts),
+          fetch(`${base}&filter[inviteType]=EMAIL`, opts),
+          fetch(`${base}&filter[inviteType]=PUBLIC_LINK`, opts),
+        ])
+        if (totalRes.ok) groupTesterCount = (await totalRes.json())?.meta?.paging?.total ?? null
+        if (emailRes.ok) emailTesterCount = (await emailRes.json())?.meta?.paging?.total ?? null
+        if (plRes.ok) publicLinkTesterCount = (await plRes.json())?.meta?.paging?.total ?? null
+      } catch {
+        // non-fatal — still return other data
+      }
+    }
+
+    return {
+      totalTesters: groupTesterCount,
+      emailTesters: emailTesterCount,
+      publicLinkTesters: publicLinkTesterCount,
+      totalBuilds: buildsData?.meta?.paging?.total ?? null,
+      externalGroupName: externalGroup?.attributes?.name ?? null,
+      publicLink: externalGroup?.attributes?.publicLink ?? null,
+      publicLinkEnabled: externalGroup?.attributes?.publicLinkEnabled ?? null,
+      debugError: groupsDebugError,
+    }
+  } catch (e) {
+    return { totalTesters: null, emailTesters: null, publicLinkTesters: null, totalBuilds: null, externalGroupName: null, publicLink: null, publicLinkEnabled: null, debugError: String(e) }
+  }
 }
 
 async function hogql(query: string): Promise<unknown[][]> {
@@ -30,7 +132,7 @@ async function hogql(query: string): Promise<unknown[][]> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query: { kind: 'HogQLQuery', query } }),
-    next: { revalidate: 300 }, // 5-minute cache
+    next: { revalidate: 60 },
   })
   if (!res.ok) throw new Error(`PostHog ${res.status}: ${await res.text()}`)
   const json = await res.json()
@@ -41,6 +143,8 @@ export async function GET(request: NextRequest) {
   if (!PROJECT_ID || !PERSONAL_KEY) {
     return NextResponse.json({ error: 'PostHog credentials not configured' }, { status: 503 })
   }
+
+  const appleStats = await fetchAppleStats()
 
   const { searchParams } = new URL(request.url)
   const range = Math.min(Math.max(parseInt(searchParams.get('range') ?? '30'), 7), 365)
@@ -80,6 +184,7 @@ export async function GET(request: NextRequest) {
           'tab_viewed','pick_for_me_started','pick_for_me_completed',
           'describe_it_used','cinema_search_used','search_performed',
           'item_detail_viewed','item_added','item_rated','friend_added',
+          'friend_profile_viewed','collection_browsed',
           'trailer_opened','streaming_checked','external_rating_fetched'
         )
         AND timestamp >= now() - INTERVAL 30 DAY
@@ -147,6 +252,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       range,
       distribution,
+      apple: appleStats,
       summary: {
         totalUsers: Number(totalUsers),
         totalSessions: Number(totalSessions),

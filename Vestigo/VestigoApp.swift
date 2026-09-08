@@ -9,6 +9,7 @@ extension Notification.Name {
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        AnalyticsService.shared.setup()
         application.shortcutItems = [
             UIApplicationShortcutItem(type: "openWatchlist", localizedTitle: "Watchlist", localizedSubtitle: nil, icon: UIApplicationShortcutIcon(systemImageName: "bookmark"), userInfo: nil),
             UIApplicationShortcutItem(type: "openSearch", localizedTitle: "Search", localizedSubtitle: nil, icon: UIApplicationShortcutIcon(systemImageName: "magnifyingglass"), userInfo: nil),

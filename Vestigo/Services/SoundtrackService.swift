@@ -81,6 +81,7 @@ struct SoundtrackAvailabilityService {
 
         do {
             let response: AppleMusicSearchResponse = try await fetch(url)
+            AnalyticsService.shared.track(.apiCallMade(service: "itunes"))
             return response.results.contains { result in
                 result.collectionName.normalizedSoundtrackSearchText.containsSoundtrackSignal
             }
@@ -99,6 +100,7 @@ struct SoundtrackAvailabilityService {
 
         do {
             let response: DeezerAlbumSearchResponse = try await fetch(url)
+            AnalyticsService.shared.track(.apiCallMade(service: "deezer"))
             return response.data.contains { album in
                 album.title.normalizedSoundtrackSearchText.containsSoundtrackSignal
             }

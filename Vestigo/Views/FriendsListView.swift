@@ -33,7 +33,7 @@ struct FriendsListView: View {
                 }
             } else {
                 FriendFavouritesSection(friends: friends, model: model)
-                FriendExcitedForSection(friends: friends, model: model)
+                WatchWithSection(friends: friends, model: model)
 
                 ForEach(friends) { friend in
                     Button { onSelect(friend) } label: {
@@ -43,21 +43,28 @@ struct FriendsListView: View {
                                 Text(friend.name)
                                     .font(.subheadline.bold())
                                     .foregroundStyle(.primary)
-                                if let activity = friend.recentActivity {
-                                    Text("Active \(activity.formatted(.relative(presentation: .named)))")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                if let lastItem = friend.watchedItems.first {
+                                if let lastItem = friend.mostRecentlyWatchedItem {
+                                    let watchDate = friend.watchedDates[lastItem.key.stableID]
                                     HStack(spacing: 4) {
                                         Image(systemName: "checkmark")
                                             .font(.system(size: 9, weight: .semibold))
                                             .foregroundStyle(.tertiary)
-                                        Text(lastItem.title)
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                            .lineLimit(1)
+                                        if let date = watchDate {
+                                            Text("\(lastItem.title) · \(date.formatted(.relative(presentation: .named)))")
+                                                .font(.caption2)
+                                                .foregroundStyle(.tertiary)
+                                                .lineLimit(1)
+                                        } else {
+                                            Text(lastItem.title)
+                                                .font(.caption2)
+                                                .foregroundStyle(.tertiary)
+                                                .lineLimit(1)
+                                        }
                                     }
+                                } else if let activity = friend.recentActivity {
+                                    Text("Active \(activity.formatted(.relative(presentation: .named)))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
                             }
                             Spacer()

@@ -85,6 +85,7 @@ actor VestigoBackendClient {
 
         guard let url = components.url else { return nil }
         let (data, response) = try await URLSession.shared.data(from: url)
+        Task.detached { @MainActor in AnalyticsService.shared.track(.apiCallMade(service: "tvdb")) }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
@@ -122,6 +123,7 @@ actor VestigoBackendClient {
 
         guard let url = components.url else { throw URLError(.badURL) }
         let (data, response) = try await URLSession.shared.data(from: url)
+        Task.detached { @MainActor in AnalyticsService.shared.track(.apiCallMade(service: "tvdb")) }
 
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
             throw URLError(.badServerResponse)
@@ -140,6 +142,7 @@ actor VestigoBackendClient {
 
         guard let url = components.url else { return nil }
         let (data, response) = try await URLSession.shared.data(from: url)
+        Task.detached { @MainActor in AnalyticsService.shared.track(.apiCallMade(service: "tmdb")) }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
@@ -165,6 +168,7 @@ actor VestigoBackendClient {
 
         guard let url = components.url else { return [] }
         let (data, response) = try await URLSession.shared.data(from: url)
+        Task.detached { @MainActor in AnalyticsService.shared.track(.apiCallMade(service: "tmdb")) }
 
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
             throw URLError(.badServerResponse)
@@ -195,6 +199,7 @@ actor VestigoBackendClient {
 
         guard let url = components.url else { return nil }
         let (data, response) = try await URLSession.shared.data(from: url)
+        Task.detached { @MainActor in AnalyticsService.shared.track(.apiCallMade(service: "omdb")) }
 
         guard let httpResponse = response as? HTTPURLResponse else { return nil }
 
@@ -204,6 +209,21 @@ actor VestigoBackendClient {
 
         let decoded = try JSONDecoder().decode(BackendRatingsResponse.self, from: data)
         return decoded.ratings
+    }
+
+    func reportOMDbUsage(date: String, dailyCount: Int, totalCount: Int, dailyLimit: Int) async {
+        guard let url = URLComponents(url: baseURL.appending(path: "report-omdb-usage"), resolvingAgainstBaseURL: false)?.url else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "report_date": date,
+            "daily_count": dailyCount,
+            "total_count": totalCount,
+            "daily_limit": dailyLimit,
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        _ = try? await URLSession.shared.data(for: request)
     }
 
     static func normalizedTitle(_ value: String) -> String {
