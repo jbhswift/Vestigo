@@ -260,6 +260,7 @@ struct ThematicSearchView: View {
             return
         }
 
+        AnalyticsService.shared.track(.describeItUsed)
         isLoading = true
         errorMessage = nil
         results = []

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +44,12 @@ export interface RetentionStats {
   topFeaturesRetained: { event: string; name: string; count: number }[]
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const range = Math.min(Math.max(parseInt(searchParams.get('range') ?? '30'), 7), 365)
+  const dist = searchParams.get('dist') ?? 'all'
+  const knownDists = ['testflight', 'appstore', 'development']
+  const distFilter = knownDists.includes(dist) ? `AND properties.distribution = '${dist}'` : ''
   const featureList = Object.keys(FEATURE_NAMES).map(e => `'${e}'`).join(', ')
 
   let stats: RetentionStats = {
@@ -70,9 +75,10 @@ export async function GET() {
           distinct_id,
           count(DISTINCT $session_id) AS session_count
         FROM events
-        WHERE timestamp >= now() - INTERVAL 30 DAY
+        WHERE timestamp >= now() - INTERVAL ${range} DAY
           AND $session_id IS NOT NULL
           AND $session_id != ''
+          ${distFilter}
         GROUP BY distinct_id
       )
     `),
@@ -81,8 +87,9 @@ export async function GET() {
     hogql(`
       SELECT event, count() AS total
       FROM events
-      WHERE timestamp >= now() - INTERVAL 30 DAY
+      WHERE timestamp >= now() - INTERVAL ${range} DAY
         AND event IN (${featureList})
+        ${distFilter}
       GROUP BY event
       ORDER BY total DESC
     `),
@@ -91,8 +98,9 @@ export async function GET() {
     hogql(`
       SELECT event, count() AS total
       FROM events
-      WHERE timestamp >= now() - INTERVAL 30 DAY
+      WHERE timestamp >= now() - INTERVAL ${range} DAY
         AND event IN (${featureList})
+        ${distFilter}
         AND distinct_id IN (
           SELECT distinct_id
           FROM (
@@ -100,9 +108,10 @@ export async function GET() {
               distinct_id,
               count(DISTINCT $session_id) AS sessions
             FROM events
-            WHERE timestamp >= now() - INTERVAL 30 DAY
+            WHERE timestamp >= now() - INTERVAL ${range} DAY
               AND $session_id IS NOT NULL
               AND $session_id != ''
+              ${distFilter}
             GROUP BY distinct_id
           )
           WHERE sessions >= 2
@@ -139,5 +148,5 @@ export async function GET() {
     }))
   }
 
-  return NextResponse.json({ stats, updatedAt: new Date().toISOString() })
+  return NextResponse.json({ stats, range, updatedAt: new Date().toISOString() })
 }

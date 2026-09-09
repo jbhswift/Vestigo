@@ -196,8 +196,8 @@ export async function GET(): Promise<NextResponse> {
 
     const reportId = await getEngagementReport(requestId, token)
     if (!reportId) {
-      // Report may still be generating (just created the request)
-      return NextResponse.json({ data: null, error: 'Engagement report not yet available — check back in a few hours' })
+      // Report may still be generating (Apple takes 24-72h for the first report)
+      return NextResponse.json({ data: null, error: 'Engagement report not yet available — Apple can take 24–72 hours to generate the first report after the ONGOING request is created' })
     }
 
     const instanceId = await getMostRecentInstance(reportId, token)

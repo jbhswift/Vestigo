@@ -20,6 +20,8 @@ import {
 
 type DayPoint = { day: string; count: number }
 type FeaturePoint = { name: string; event: string; total: number }
+type RecentUser = { distinct_id: string; first_seen: string; distribution: string | null }
+type RecentActivity = { event: string; rawEvent: string; timestamp: string; distinct_id: string; distribution: string | null }
 type OmdbSupabase = { report_date: string; daily_count: number; total_count: number; daily_limit: number } | null
 
 interface RetentionStats {
@@ -75,6 +77,8 @@ interface StatsResponse {
   users: DayPoint[]
   sessions: DayPoint[]
   features: FeaturePoint[]
+  recentUsers: RecentUser[]
+  recentActivity: RecentActivity[]
   api: {
     omdb: { todayEstimate: number; periodTotal: number; daily: DayPoint[]; supabase: OmdbSupabase }
     groq: { periodTotal: number; note: string }
@@ -191,7 +195,7 @@ function FeatureChart({ data }: { data: FeaturePoint[] }) {
     <div className="card">
       <p className="text-sm font-medium text-zinc-300 mb-4">Feature Usage <span className="text-zinc-500 font-normal">(last 30 days)</span></p>
       <ResponsiveContainer width="100%" height={Math.max(220, data.length * 32)}>
-        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 60, left: 140, bottom: 0 }}>
+        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 60, left: 4, bottom: 0 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#27272a" />
           <XAxis type="number" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
           <YAxis
@@ -227,7 +231,7 @@ function RetentionFeatureChart({ data, label }: { data: { name: string; count: n
     <div>
       <p className="text-sm font-medium text-zinc-400 mb-3">{label}</p>
       <ResponsiveContainer width="100%" height={Math.max(180, data.length * 30)}>
-        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 48, left: 130, bottom: 0 }}>
+        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 48, left: 4, bottom: 0 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#27272a" />
           <XAxis type="number" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
           <YAxis
@@ -305,6 +309,28 @@ function StatRow({ label, value, note }: { label: string; value?: string | numbe
   )
 }
 
+function ExpandableList({ title, totalCount, children }: { title: string; totalCount: number; children: React.ReactNode }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div className="card">
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between">
+        <span className="text-sm font-medium text-zinc-300">{title}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500">{totalCount} {totalCount === 1 ? 'item' : 'items'}</span>
+          <svg className={`w-4 h-4 text-zinc-500 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+      {expanded && (
+        <div className="mt-3 border-t border-zinc-800 pt-3 max-h-96 overflow-y-auto">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Main dashboard
 // ---------------------------------------------------------------------------
@@ -318,6 +344,8 @@ const RANGES = [
 const DISTS = [
   { label: 'All', value: 'all' },
   { label: 'TestFlight', value: 'testflight' },
+  { label: 'App Store', value: 'appstore' },
+  { label: 'Dev', value: 'development' },
 ]
 
 export default function Dashboard() {
@@ -339,7 +367,7 @@ export default function Dashboard() {
       const [statsRes, quotasRes, retentionRes, ascRes] = await Promise.all([
         fetch(`/api/stats?range=${range}&dist=${dist}`),
         fetch('/api/quotas'),
-        fetch('/api/retention'),
+        fetch(`/api/retention?range=${range}&dist=${dist}`),
         fetch('/api/asc-retention'),
       ])
       if (!statsRes.ok) throw new Error(await statsRes.text())
@@ -525,9 +553,28 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Recent Users */}
+      {!loading && (data?.recentUsers?.length ?? 0) > 0 && (
+        <ExpandableList title="Most Recent Users" totalCount={data!.recentUsers.length}>
+          {data!.recentUsers.map((user, i) => (
+            <div key={i} className="flex items-center justify-between py-1.5 text-sm border-b border-zinc-800/50 last:border-0">
+              <span className="font-mono text-xs text-zinc-400 truncate max-w-[180px] sm:max-w-xs">{user.distinct_id}</span>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                {user.distribution && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">{user.distribution}</span>
+                )}
+                <span className="text-xs text-zinc-500">
+                  {new Date(user.first_seen).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+          ))}
+        </ExpandableList>
+      )}
+
       {/* Returning Users */}
       <div>
-        <h2 className="text-base font-semibold text-zinc-300 mb-3">Returning Users <span className="text-zinc-500 font-normal text-sm">— last 30 days</span></h2>
+        <h2 className="text-base font-semibold text-zinc-300 mb-3">Returning Users <span className="text-zinc-500 font-normal text-sm">— last {range} days</span></h2>
 
         {/* PostHog-based retention */}
         <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">From PostHog</p>
@@ -565,12 +612,53 @@ export default function Dashboard() {
             No feature events yet — ship a build with analytics to see data
           </div>
         )}
+      </div>
 
-        {/* App Store Connect engagement */}
-        <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">
-          From App Store Connect
-          {ascRetention?.reportDate && <span className="normal-case ml-1">— data through {ascRetention.reportDate}</span>}
-        </p>
+      {/* Timeline charts */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <TimelineChart
+          data={data?.users ?? []}
+          color="#6366f1"
+          label={`Unique Users per Day (${range}d${dist !== 'all' ? ` · ${dist}` : ''})`}
+        />
+        <TimelineChart
+          data={data?.sessions ?? []}
+          color="#22c55e"
+          label={`Sessions per Day (${range}d)`}
+        />
+      </div>
+
+      {/* Feature usage */}
+      <FeatureChart data={features} />
+
+      {/* Recent Activity */}
+      {!loading && (data?.recentActivity?.length ?? 0) > 0 && (
+        <ExpandableList title="Most Recent Actions" totalCount={data!.recentActivity.length}>
+          {data!.recentActivity.map((action, i) => (
+            <div key={i} className="flex items-center justify-between py-1.5 text-sm border-b border-zinc-800/50 last:border-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-zinc-200 text-xs shrink-0">{action.event}</span>
+                <span className="font-mono text-[10px] text-zinc-600 truncate">{action.distinct_id}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                {action.distribution && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">{action.distribution}</span>
+                )}
+                <span className="text-xs text-zinc-500">
+                  {new Date(action.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+          ))}
+        </ExpandableList>
+      )}
+
+      {/* App Store Connect engagement */}
+      <div>
+        <h2 className="text-base font-semibold text-zinc-300 mb-3">
+          App Store Connect Engagement
+          {ascRetention?.reportDate && <span className="text-zinc-500 font-normal text-sm ml-2">— data through {ascRetention.reportDate}</span>}
+        </h2>
         {ascRetention?.error && !ascRetention.activeDevices30d ? (
           <div className="card text-sm text-zinc-500">{ascRetention.error}</div>
         ) : (
@@ -593,23 +681,6 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-
-      {/* Timeline charts */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <TimelineChart
-          data={data?.users ?? []}
-          color="#6366f1"
-          label={`Unique Users per Day (${range}d${dist !== 'all' ? ` · ${dist}` : ''})`}
-        />
-        <TimelineChart
-          data={data?.sessions ?? []}
-          color="#22c55e"
-          label={`Sessions per Day (${range}d)`}
-        />
-      </div>
-
-      {/* Feature usage */}
-      <FeatureChart data={features} />
 
       {/* API Quotas */}
       {quotas.length > 0 && (

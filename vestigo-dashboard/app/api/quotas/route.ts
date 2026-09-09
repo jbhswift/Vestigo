@@ -36,6 +36,14 @@ function nextMonthlyReset(): string {
   return t.toISOString()
 }
 
+function endOfMonthReset(): string {
+  const t = new Date()
+  // last moment of the current month
+  t.setUTCMonth(t.getUTCMonth() + 1, 0)
+  t.setUTCHours(23, 59, 59, 0)
+  return t.toISOString()
+}
+
 async function hogql(query: string): Promise<unknown[][]> {
   const res = await fetch(`${POSTHOG_HOST}/api/projects/${PROJECT_ID}/query/`, {
     method: 'POST',
@@ -121,24 +129,23 @@ export async function GET() {
     })
   }
 
-  // ── Watchmode (live if key set) ──────────────────────────────────────────
+  // ── Watchmode (live via /v1/status/) ────────────────────────────────────
   const watchmodeKey = process.env.WATCHMODE_API_KEY
   if (watchmodeKey) {
     try {
-      const res = await fetch(
-        `https://api.watchmode.com/v1/account/?apiKey=${watchmodeKey}`,
-        { next: { revalidate: 60 } }
-      )
-      if (!res.ok) throw new Error(String(res.status))
-      const d = await res.json()
-      const acct = d.account ?? d
+      const wmRes = await fetch(`https://api.watchmode.com/v1/status/?apiKey=${watchmodeKey}`, {
+        next: { revalidate: 300 },
+      })
+      if (!wmRes.ok) throw new Error(`HTTP ${wmRes.status}`)
+      const wm = await wmRes.json()
+      const wmUsed: number | null = wm.account_calls_used ?? null
+      const wmLimit: number | null = wm.account_calls_limit ?? null
+      const wmResetRaw: string | null = wm.quota_reset_datetime_utc ?? null
+      const wmResetsAt = wmResetRaw ? new Date(wmResetRaw).toISOString() : nextMonthlyReset()
       quotas.push({
         key: 'watchmode', name: 'Watchmode',
-        limit: acct.requests_quota_monthly ?? acct.quota_monthly ?? null,
-        limitUnit: 'calls', period: 'month',
-        used: acct.requests_this_month ?? null,
-        allTime: null,
-        resetsAt: nextMonthlyReset(),
+        limit: wmLimit, limitUnit: 'calls', period: 'month',
+        used: wmUsed, allTime: null, resetsAt: wmResetsAt,
         dataSource: 'live',
         dashboardUrl: 'https://api.watchmode.com/',
       })
@@ -146,8 +153,9 @@ export async function GET() {
       quotas.push({
         key: 'watchmode', name: 'Watchmode',
         limit: null, limitUnit: 'calls', period: 'month',
-        used: null, allTime: null, resetsAt: nextMonthlyReset(),
-        dataSource: 'static', note: `Account API error: ${String(e)}`,
+        used: phCounts['watchmode'] ?? null, allTime: null, resetsAt: nextMonthlyReset(),
+        dataSource: 'live',
+        note: `Status API error: ${String(e)} — count from PostHog.`,
         dashboardUrl: 'https://api.watchmode.com/',
       })
     }
@@ -155,10 +163,52 @@ export async function GET() {
     quotas.push({
       key: 'watchmode', name: 'Watchmode',
       limit: null, limitUnit: 'calls', period: 'month',
-      used: phCounts['watchmode'] ?? null, allTime: null, resetsAt: nextMonthlyReset(),
-      dataSource: 'live',
-      note: 'Streaming availability — via Supabase backend. Call count from PostHog.',
+      used: null, allTime: null, resetsAt: nextMonthlyReset(),
+      dataSource: 'static', unconfigured: true,
       dashboardUrl: 'https://api.watchmode.com/',
+    })
+  }
+
+  // ── Brandfetch (live via /v2/me) ─────────────────────────────────────────
+  const brandfetchKey = process.env.BRANDFETCH_CLIENT_ID
+  if (brandfetchKey) {
+    try {
+      const bfRes = await fetch('https://api.brandfetch.io/v2/me', {
+        headers: { Authorization: `Bearer ${brandfetchKey}` },
+        next: { revalidate: 300 },
+      })
+      if (!bfRes.ok) throw new Error(`HTTP ${bfRes.status}`)
+      const bf = await bfRes.json()
+      const bfUsed: number | null = bf.requests?.used ?? bf.quota?.used ?? null
+      const bfLimit: number | null = bf.requests?.limit ?? bf.quota?.limit ?? 1_000_000
+      const bfResetRaw: string | null = bf.requests?.resetsAt ?? bf.quota?.resetsAt ?? null
+      const bfResetsAt = bfResetRaw ? new Date(bfResetRaw).toISOString() : endOfMonthReset()
+      quotas.push({
+        key: 'brandfetch', name: 'Brandfetch',
+        limit: bfLimit, limitUnit: 'calls', period: 'month',
+        used: bfUsed, allTime: null, resetsAt: bfResetsAt,
+        dataSource: 'live',
+        dashboardUrl: 'https://brandfetch.com/dashboard',
+      })
+    } catch (e) {
+      quotas.push({
+        key: 'brandfetch', name: 'Brandfetch',
+        limit: 1_000_000, limitUnit: 'calls', period: 'month',
+        used: phCounts['brandfetch'] ?? null, allTime: null, resetsAt: endOfMonthReset(),
+        dataSource: 'live',
+        note: `API error: ${String(e)} — count from PostHog.`,
+        dashboardUrl: 'https://brandfetch.com/dashboard',
+      })
+    }
+  } else {
+    quotas.push({
+      key: 'brandfetch', name: 'Brandfetch',
+      limit: 1_000_000, limitUnit: 'calls', period: 'month',
+      used: phCounts['brandfetch'] ?? null, allTime: null, resetsAt: endOfMonthReset(),
+      dataSource: phCounts['brandfetch'] != null ? 'live' : 'static',
+      unconfigured: true,
+      note: 'Add BRANDFETCH_CLIENT_ID to Vercel env vars.',
+      dashboardUrl: 'https://brandfetch.com/dashboard',
     })
   }
 

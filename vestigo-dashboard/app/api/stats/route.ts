@@ -150,15 +150,13 @@ export async function GET(request: NextRequest) {
   const range = Math.min(Math.max(parseInt(searchParams.get('range') ?? '30'), 7), 365)
   const distribution = searchParams.get('dist') ?? 'all' // 'all' | 'testflight' | 'appstore'
 
-  const distFilter =
-    distribution === 'testflight'
-      ? `AND properties.distribution = 'testflight'`
-      : distribution === 'appstore'
-        ? `AND properties.distribution = 'appstore'`
-        : ''
+  const knownDists = ['testflight', 'appstore', 'development']
+  const distFilter = knownDists.includes(distribution)
+    ? `AND properties.distribution = '${distribution}'`
+    : ''
 
   try {
-    const [usersRows, sessionsRows, featureRows, summaryRows, omdbRows] = await Promise.all([
+    const [usersRows, sessionsRows, featureRows, summaryRows, omdbRows, recentUsersRows, recentActivityRows] = await Promise.all([
       // Unique users per day
       hogql(`
         SELECT toDate(timestamp) AS day, uniq(person_id) AS users
@@ -209,6 +207,32 @@ export async function GET(request: NextRequest) {
           AND timestamp >= now() - INTERVAL ${range} DAY
         GROUP BY day ORDER BY day ASC
       `),
+
+      // Recent users: most recently first-seen within range
+      hogql(`
+        SELECT distinct_id, min(timestamp) AS first_seen, anyLast(properties.distribution) AS distribution
+        FROM events
+        WHERE timestamp >= now() - INTERVAL ${range} DAY ${distFilter}
+        GROUP BY distinct_id
+        ORDER BY first_seen DESC
+        LIMIT 50
+      `),
+
+      // Recent activity: latest feature events
+      hogql(`
+        SELECT event, timestamp, distinct_id, properties.distribution AS distribution
+        FROM events
+        WHERE event IN (
+          'tab_viewed','pick_for_me_started','pick_for_me_completed',
+          'describe_it_used','cinema_search_used','search_performed',
+          'item_detail_viewed','item_added','item_rated','friend_added',
+          'friend_profile_viewed','collection_browsed',
+          'trailer_opened','streaming_checked','external_rating_fetched'
+        )
+        AND timestamp >= now() - INTERVAL ${range} DAY ${distFilter}
+        ORDER BY timestamp DESC
+        LIMIT 100
+      `),
     ])
 
     const users = usersRows.map(([day, count]) => ({ day, count: Number(count) }))
@@ -220,6 +244,18 @@ export async function GET(request: NextRequest) {
     }))
     const [totalUsers, totalSessions, totalEvents] = summaryRows[0] ?? [0, 0, 0]
     const omdbDaily = omdbRows.map(([day, count]) => ({ day, count: Number(count) }))
+    const recentUsers = recentUsersRows.map(([distinct_id, first_seen, distribution]) => ({
+      distinct_id: String(distinct_id),
+      first_seen: String(first_seen),
+      distribution: distribution ? String(distribution) : null,
+    }))
+    const recentActivity = recentActivityRows.map(([event, timestamp, distinct_id, distribution]) => ({
+      event: FEATURE_LABELS[event as string] ?? String(event),
+      rawEvent: String(event),
+      timestamp: String(timestamp),
+      distinct_id: String(distinct_id),
+      distribution: distribution ? String(distribution) : null,
+    }))
 
     // Groq estimates: each pick_for_me_started + describe_it_used = 1 Groq call
     const groqTotal =
@@ -261,6 +297,8 @@ export async function GET(request: NextRequest) {
       users,
       sessions,
       features,
+      recentUsers,
+      recentActivity,
       api: {
         omdb: {
           todayEstimate: omdbToday,

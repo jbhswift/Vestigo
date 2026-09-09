@@ -94,6 +94,14 @@ final class AnalyticsService: @unchecked Sendable {
         #endif
     }
 
+    private var distribution: String {
+        #if DEBUG
+        return "development"
+        #else
+        return isTestFlight ? "testflight" : "appstore"
+        #endif
+    }
+
     func setup() {
         guard !isSimulator else {
             print("[Analytics] Simulator detected — analytics disabled")
@@ -140,7 +148,7 @@ final class AnalyticsService: @unchecked Sendable {
         config.captureScreenViews = false
         PostHogSDK.shared.setup(config)
         PostHogSDK.shared.register([
-            "distribution": isTestFlight ? "testflight" : "appstore",
+            "distribution": distribution,
             "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
         ])
         print("[Analytics] PostHog ready ✓")
@@ -174,7 +182,7 @@ final class AnalyticsService: @unchecked Sendable {
         guard !cloudKitID.isEmpty else { return }
         PostHogSDK.shared.identify(cloudKitID, userProperties: [
             "name": name.isEmpty ? "Unknown" : name,
-            "distribution": isTestFlight ? "testflight" : "appstore",
+            "distribution": distribution,
         ])
     }
 
