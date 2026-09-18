@@ -83,6 +83,7 @@ extension VestigoModel {
     func confirmPendingRatingPrompt() {
         guard let item = pendingRatingPromptItem else { return }
         let shouldMakeFavourite = pendingRatingPromptMakeFavourite
+        let shouldFeature = pendingRatingPromptMakeFeature
 
         setRating(pendingRatingPromptValue, for: item)
         if let date = pendingRatingPromptDate {
@@ -92,6 +93,7 @@ extension VestigoModel {
         pendingRatingPromptValue = 0
         pendingRatingPromptDate = nil
         pendingRatingPromptMakeFavourite = false
+        pendingRatingPromptMakeFeature = false
         pendingRatingPromptRestoreWatchlist = false
 
         if shouldMakeFavourite, !library.isFavourite(item) {
@@ -99,6 +101,23 @@ extension VestigoModel {
         } else if !shouldMakeFavourite, library.isFavourite(item) {
             requestToggleFavourite(item)
         }
+        if shouldFeature, !isFeatured(item) {
+            toggleFeatured(item)
+        }
+    }
+
+    func isFeatured(_ item: MediaItem) -> Bool {
+        settings.socialFeaturedItemKeys.contains(item.key.stableID)
+    }
+
+    func toggleFeatured(_ item: MediaItem) {
+        let id = item.key.stableID
+        if let idx = settings.socialFeaturedItemKeys.firstIndex(of: id) {
+            settings.socialFeaturedItemKeys.remove(at: idx)
+        } else if settings.socialFeaturedItemKeys.count < 6 {
+            settings.socialFeaturedItemKeys.append(id)
+        }
+        saveSettings()
     }
 
     func dismissPendingRatingPrompt() {
@@ -110,6 +129,7 @@ extension VestigoModel {
         pendingRatingPromptValue = 0
         pendingRatingPromptDate = nil
         pendingRatingPromptMakeFavourite = false
+        pendingRatingPromptMakeFeature = false
         pendingRatingPromptRestoreWatchlist = false
     }
 

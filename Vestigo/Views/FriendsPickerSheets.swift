@@ -366,15 +366,17 @@ struct ExcitedForPickerSheet: View {
         .onDisappear { save() }
         .onChange(of: searchText) { _, text in
             remoteTask?.cancel()
-            guard !text.isEmpty else { return }
+            isSearchingRemote = false
+            let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !query.isEmpty else { return }
             remoteTask = Task {
-                try? await Task.sleep(nanoseconds: 600_000_000)
                 guard !Task.isCancelled else { return }
-                let q = text.lowercased()
+                let q = query.lowercased()
                 let localCount = applyKind(baseItems).filter { $0.title.lowercased().contains(q) }.count
                 if localCount < 5 {
                     isSearchingRemote = true
-                    let found = await model.quickSearch(query: text)
+                    let found = await model.quickSearch(query: query)
+                    guard !Task.isCancelled else { return }
                     model.cacheUpcomingItems(from: found)
                     let today = Calendar.current.startOfDay(for: Date())
                     for item in found {

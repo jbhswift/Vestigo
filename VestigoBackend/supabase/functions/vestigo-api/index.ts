@@ -147,6 +147,7 @@ async function fetchTMDb(path: string, params: Record<string, string> = {}) {
   }
 
   trackApiCall("tmdb")
+  incrementServiceCall("tmdb")
   return await response.json()
 }
 
@@ -363,6 +364,7 @@ async function fetchWatchmode(path: string, params: Record<string, string> = {})
   }
 
   trackApiCall("watchmode")
+  incrementServiceCall("watchmode")
   return await response.json()
 }
 
@@ -615,6 +617,7 @@ async function fetchWikidataSPARQL(query: string) {
     throw new Error(`Wikidata request failed: ${response.status} ${text}`)
   }
 
+  incrementServiceCall("wikidata")
   return await response.json()
 }
 
@@ -841,6 +844,7 @@ async function fetchTVDB(path: string, token: string) {
   }
 
   trackApiCall("tvdb")
+  incrementServiceCall("tvdb")
   const json = await response.json()
   return json.data
 }
@@ -1169,8 +1173,50 @@ async function getAIUsage(date: string): Promise<number> {
   return Number(entry.value ?? 0n)
 }
 
+// Server-side call metering — increments a counter per service per day in Deno KV.
+// This is the authoritative source for services that have no native usage API.
+function incrementServiceCall(service: string): void {
+  try {
+    if (typeof Deno.openKv !== "function") {
+      return
+    }
+
+    Deno.openKv().then(kv =>
+      kv.atomic().sum(["calls", service, todayUTC()], 1n).commit()
+    ).catch(() => {})
+  } catch {
+    // Non-fatal — don't fail the request if KV is unavailable
+  }
+}
+
+const SERVICE_USAGE_KEYS = ["tmdb", "watchmode", "tvdb", "wikidata", "openrouter", "amc", "brandfetch", "youtube", "supabase_edge"]
+
+async function getServiceUsage(days = 30): Promise<Record<string, number>> {
+  const kv = await Deno.openKv()
+  const counts: Record<string, number> = {}
+  const dates: string[] = []
+  const now = new Date()
+  for (let i = 0; i < days; i++) {
+    const d = new Date(now)
+    d.setUTCDate(d.getUTCDate() - i)
+    dates.push(d.toISOString().slice(0, 10))
+  }
+  await Promise.all(SERVICE_USAGE_KEYS.map(async (svc) => {
+    let total = 0
+    await Promise.all(dates.map(async (date) => {
+      const entry = await kv.get<Deno.KvU64>(["calls", svc, date])
+      total += Number(entry.value ?? 0n)
+    }))
+    counts[svc] = total
+  }))
+  return counts
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url)
+
+  // Count every invocation — each request to this function = 1 Supabase Edge invocation
+  incrementServiceCall("supabase_edge")
 
   try {
     if (url.pathname.endsWith("/ai-usage")) {
@@ -1571,6 +1617,7 @@ Deno.serve(async (req) => {
       }
 
       trackApiCall("amc")
+      incrementServiceCall("amc")
       const amcData = await amcResp.json()
 
       // Pass ?debug=1 to see the raw AMC response for response shape diagnosis
@@ -1764,6 +1811,7 @@ Rules:
       })
 
       trackApiCall("openrouter")
+      incrementServiceCall("openrouter")
       await incrementAIUsage()
       return Response.json({ ok: true, titles })
     }
@@ -1846,6 +1894,7 @@ Rules:
 
       const rankings = Array.isArray(rerankParsed?.rankings) ? rerankParsed.rankings : []
       trackApiCall("openrouter")
+      incrementServiceCall("openrouter")
       await incrementAIUsage()
       return Response.json({ ok: true, rankings })
     }
@@ -1928,6 +1977,7 @@ Rules:
       }
 
       trackApiCall("openrouter")
+      incrementServiceCall("openrouter")
       await incrementAIUsage()
       return Response.json({ ok: true, ...parsed })
     }
@@ -1991,6 +2041,9 @@ Rules:
       const checks = await Promise.all(keys.map(async key => ({ key, isShort: await isYouTubeShort(key) })))
       const shortKeys = checks.filter(({ isShort }) => isShort).map(({ key }) => key)
 
+      // Count one call per video checked (not per short found)
+      for (let i = 0; i < keys.length; i++) incrementServiceCall("youtube")
+
       return Response.json({ ok: true, shortKeys })
     }
 
@@ -2012,6 +2065,8 @@ Rules:
         `https://cdn.brandfetch.io/${domain}/w/${w}/h/${h}/fallback/404?c=${clientId}`
       )
 
+      if (upstream.ok) incrementServiceCall("brandfetch")
+
       return new Response(upstream.body, {
         status: upstream.status,
         headers: {
@@ -2019,6 +2074,12 @@ Rules:
           "Cache-Control": "public, max-age=86400",
         },
       })
+    }
+
+    if (url.pathname.endsWith("/service-usage")) {
+      const days = Math.min(Math.max(Number(url.searchParams.get("days") ?? "30"), 1), 90)
+      const counts = await getServiceUsage(days)
+      return Response.json({ ok: true, days, counts })
     }
 
     return Response.json(

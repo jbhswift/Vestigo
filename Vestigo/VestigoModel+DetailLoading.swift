@@ -107,6 +107,29 @@ extension VestigoModel {
                 }
             } catch { }
         }
+        // TMDb recommendations fallback — fires when the initial detail response had no similar items.
+        // Uses standalone endpoints with proper API-evidence keys so items bypass the human-evidence gate.
+        if let detail = detailsCache[item.key], detail.similar.isEmpty {
+            do {
+                async let recItems = tmdb.recommendations(for: item.key)
+                async let simItems = tmdb.sameSeriesOrSimilar(for: item.key)
+                let (recs, sims) = try await (recItems, simItems)
+                let recFiltered = recs.filter { $0.key != item.key }
+                let simFiltered = sims.filter { $0.key != item.key }
+                let recKeys = Set(recFiltered.map(\.key))
+                let simKeys = Set(simFiltered.map(\.key)).subtracting(recKeys)
+                let allCandidates = (recFiltered + simFiltered).uniqued()
+                if !allCandidates.isEmpty, let latestDetail = detailsCache[item.key] {
+                    detailsCache[item.key] = latestDetail.addingSimilarCandidates(
+                        allCandidates,
+                        source: item,
+                        strongAPISimilarityKeys: recKeys,
+                        mediumAPISimilarityKeys: simKeys,
+                        externalRatings: externalRatingsCache
+                    )
+                }
+            } catch { }
+        }
         await loadExternalRatings(item, priority: true)
         if providerCache[item.key] == nil {
             do {
@@ -442,6 +465,16 @@ extension VestigoModel {
     func forceICloudPush() -> String {
         Storage.saveKVSnapshot(library: library, settings: settings)
         return "Pushed at \(Date().formatted(date: .omitted, time: .standard))"
+    }
+
+    @discardableResult
+    func forceICloudFetch() -> String {
+        guard let snapshot = Storage.loadKVSnapshot() else {
+            return "No snapshot found in iCloud"
+        }
+        applyKVSnapshot(snapshot)
+        Storage.save(snapshot.modifiedAt, key: "Vestigo.localSnapshotModifiedAt")
+        return "Fetched snapshot from \(snapshot.modifiedAt.formatted(date: .omitted, time: .standard))"
     }
 
     func simulateFirstLaunch() {

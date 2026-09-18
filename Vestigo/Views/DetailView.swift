@@ -125,6 +125,7 @@ struct DetailView: View {
                 headerSection
                 ratingSection
                 detailButtons
+                featuredSection
                 overviewSection
                 actionSection
                 castSection

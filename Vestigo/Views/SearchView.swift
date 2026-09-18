@@ -6,7 +6,6 @@ struct SearchView: View {
     @ObservedObject var model: VestigoModel
     @State private var showingThematicSearch = false
     @FocusState private var searchIsFocused: Bool
-    @State private var searchTask: Task<Void, Never>? = nil
 
     var body: some View {
         BaseScreen(title: "Search", filter: .constant(model.searchFilter.mediaFilter ?? .movie), settings: model.settings, onRefresh: {
@@ -17,12 +16,7 @@ struct SearchView: View {
                     commitSearchInput()
                 }
                 .onChange(of: model.searchText) { _, _ in
-                    searchTask?.cancel()
-                    searchTask = Task {
-                        try? await Task.sleep(for: .milliseconds(1000))
-                        guard !Task.isCancelled else { return }
-                        model.updateSearch()
-                    }
+                    model.updateSearch()
                 }
                 .onChange(of: searchIsFocused) { _, newValue in
                     if !newValue {
@@ -102,7 +96,12 @@ struct SearchView: View {
                     }
                     } // end else (not focused)
                 } else {
-                    if model.searchFilter == .people {
+                    if model.isSearchLoading && visibleSearchResultCount == 0 {
+                        ProgressView()
+                            .controlSize(.large)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 28)
+                    } else if model.searchFilter == .people {
                         PeopleSearchResults(people: model.searchPeopleResults, model: model)
                     } else {
                         MediaGridOrList(items: model.filteredSearchResults, hideWatchedForUpcoming: false, model: model)
@@ -113,13 +112,15 @@ struct SearchView: View {
     }
 
     private func commitSearchInput() {
-        searchTask?.cancel()
-        searchTask = nil
         searchIsFocused = false
         model.searchFieldIsFocused = false
         model.searchText = model.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if model.searchText.isEmpty { model.searchPath.removeAll() }
         model.updateSearch()
+    }
+
+    private var visibleSearchResultCount: Int {
+        model.searchFilter == .people ? model.searchPeopleResults.count : model.filteredSearchResults.count
     }
 
 }

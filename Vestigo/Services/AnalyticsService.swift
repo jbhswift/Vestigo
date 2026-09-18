@@ -156,11 +156,18 @@ final class AnalyticsService: @unchecked Sendable {
 
     private func setupSentry(dsn: String) {
         guard !dsn.isEmpty else { return }
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
         SentrySDK.start { options in
             options.dsn = dsn
             options.tracesSampleRate = 0.1
-            options.environment = self.isTestFlight ? "testflight" : "production"
+            options.environment = self.distribution
+            options.releaseName = "vestigo@\(appVersion)+\(buildNumber)"
             options.attachViewHierarchy = false
+        }
+        SentrySDK.configureScope { scope in
+            scope.setTag(value: self.distribution, key: "distribution")
+            scope.setTag(value: appVersion, key: "app_version")
         }
         print("[Analytics] Sentry ready ✓")
     }
@@ -184,6 +191,9 @@ final class AnalyticsService: @unchecked Sendable {
             "name": name.isEmpty ? "Unknown" : name,
             "distribution": distribution,
         ])
+        let sentryUser = User(userId: cloudKitID)
+        sentryUser.username = name.isEmpty ? nil : name
+        SentrySDK.setUser(sentryUser)
     }
 
     func track(_ event: AnalyticsEvent) {

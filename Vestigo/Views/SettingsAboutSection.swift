@@ -46,7 +46,7 @@ private struct DevToolsPanel: View {
     @ObservedObject var model: VestigoModel
     @State private var isCheckingBackend = false
     @State private var backendResult: String = ""
-    @State private var iCloudPushResult: String = ""
+    @State private var cloudKitResult: String = ""
 
     @State private var showLibraryImportPicker = false
     @State private var showSettingsImportPicker = false
@@ -141,11 +141,18 @@ private struct DevToolsPanel: View {
             .settingBubble()
 
             VStack(alignment: .leading, spacing: 6) {
-                Button("Force iCloud push") {
-                    iCloudPushResult = model.forceICloudPush()
+                HStack {
+                    Button("Force CloudKit publish") {
+                        cloudKitResult = model.forceICloudPush()
+                    }
+                    Spacer()
+                    Button("Force fetch") {
+                        cloudKitResult = model.forceICloudFetch()
+                    }
+                    .foregroundStyle(model.settings.accentColor)
                 }
-                if !iCloudPushResult.isEmpty {
-                    Text(iCloudPushResult)
+                if !cloudKitResult.isEmpty {
+                    Text(cloudKitResult)
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                 }

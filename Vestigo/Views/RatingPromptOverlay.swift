@@ -105,6 +105,27 @@ struct RatingPromptOverlay: ViewModifier {
                     }
                     .buttonStyle(.plain)
 
+                    Button {
+                        model.pendingRatingPromptMakeFeature.toggle()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: model.pendingRatingPromptMakeFeature ? "pin.fill" : "pin")
+                                .font(.headline.bold())
+                                .foregroundStyle(model.pendingRatingPromptMakeFeature ? model.settings.accentColor : .primary)
+
+                            Text(model.pendingRatingPromptMakeFeature ? "Feature on profile" : "Also feature on profile")
+                                .font(.headline.bold())
+
+                            Spacer(minLength: 0)
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 14)
+                        .frame(height: 46)
+                        .liquidGlass(cornerRadius: 22)
+                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
                     HStack(spacing: 12) {
                         Button("Cancel") {
                             model.dismissPendingRatingPrompt()

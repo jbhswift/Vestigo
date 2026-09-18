@@ -136,6 +136,19 @@ struct MediaItemContextMenuActions: View {
         }
 
         Button {
+            model.toggleFeatured(item)
+        } label: {
+            let featured = model.isFeatured(item)
+            let featuredLabel: String = item.isUpcoming
+                ? (featured ? "Remove from excited" : "Add to Excited For")
+                : (featured ? "Remove from featured" : "Feature on profile")
+            let featuredIcon: String = item.isUpcoming
+                ? (featured ? "bolt.heart.fill" : "bolt.heart")
+                : (featured ? "pin.slash" : "pin")
+            Label(featuredLabel, systemImage: featuredIcon)
+        }
+
+        Button {
             model.toggleNotInterested(item)
         } label: {
             Label(

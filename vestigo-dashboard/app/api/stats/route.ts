@@ -257,10 +257,8 @@ export async function GET(request: NextRequest) {
       distribution: distribution ? String(distribution) : null,
     }))
 
-    // Groq estimates: each pick_for_me_started + describe_it_used = 1 Groq call
-    const groqTotal =
-      (features.find((f) => f.event === 'pick_for_me_started')?.total ?? 0) +
-      (features.find((f) => f.event === 'describe_it_used')?.total ?? 0)
+    // OpenRouter calls: Describe It only — Pick For Me is a client-side archetypal system
+    const groqTotal = features.find((f) => f.event === 'describe_it_used')?.total ?? 0
 
     // OMDb total from external_rating_fetched events
     const omdbTotal = omdbDaily.reduce((sum, d) => sum + d.count, 0)

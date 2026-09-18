@@ -32,6 +32,8 @@ final class VestigoModel: ObservableObject {
     @Published var searchText = ""
     @Published var searchFilter: SearchFilter = .all
     @Published var searchFieldIsFocused = false
+    @Published var isSearchLoading = false
+    @Published var searchErrorText: String?
     @Published var trending: [MediaItem] = []
     @Published var popular: [MediaItem] = []
     @Published var newReleases: [MediaItem] = []
@@ -63,6 +65,7 @@ final class VestigoModel: ObservableObject {
     @Published var pendingRatingPromptValue: Double = 0
     @Published var pendingRatingPromptDate: Date? = nil
     @Published var pendingRatingPromptMakeFavourite = false
+    @Published var pendingRatingPromptMakeFeature = false
     @Published var pendingRatingPromptRestoreWatchlist = false
 
     @Published var library = UserLibrary()

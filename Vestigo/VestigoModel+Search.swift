@@ -8,20 +8,25 @@ extension VestigoModel {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let requestID = UUID()
         searchRequestID = requestID
+        searchErrorText = nil
 
         guard !query.isEmpty else {
             searchResults = []
             searchPeopleResults = []
+            isSearchLoading = false
             return
         }
 
         let cacheKey = normalizedSearchCacheKey(query, filter: searchFilter)
+        var hasCachedResults = false
         if searchFilter == .people, let cachedPeople = peopleSearchCache[cacheKey] {
             searchPeopleResults = cachedPeople
             searchResults = []
+            hasCachedResults = true
         } else if searchFilter != .people, let cachedResults = mediaSearchCache[cacheKey] {
             searchResults = cachedResults
             searchPeopleResults = []
+            hasCachedResults = true
         } else if searchFilter != .people {
             searchResults = instantSearchRefinement(for: query)
             searchPeopleResults = []
@@ -29,9 +34,9 @@ extension VestigoModel {
             searchPeopleResults = []
             searchResults = []
         }
+        isSearchLoading = !hasCachedResults
 
         searchTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 120_000_000)
             guard let self, !Task.isCancelled else { return }
             guard await MainActor.run(body: { self.searchRequestID == requestID }) else { return }
 
@@ -43,6 +48,7 @@ extension VestigoModel {
                         self.peopleSearchCache[cacheKey] = people
                         self.searchPeopleResults = people
                         self.searchResults = []
+                        self.isSearchLoading = false
                     }
                 } else if let filter = self.searchFilter.mediaFilter {
                     let rankedVisibleResults = try await self.searchMediaResults(query: query, filter: filter)
@@ -51,6 +57,7 @@ extension VestigoModel {
                         self.mediaSearchCache[cacheKey] = rankedVisibleResults
                         self.searchResults = rankedVisibleResults
                         self.searchPeopleResults = []
+                        self.isSearchLoading = false
                         self.cacheUpcomingItems(from: rankedVisibleResults)
                         self.refreshSearchRatingsIfCurrent(
                             rankedVisibleResults,
@@ -64,7 +71,12 @@ extension VestigoModel {
                 if LoadErrorFilter.shouldIgnore(error) {
                     return
                 }
-                await MainActor.run { self.errorText = error.localizedDescription }
+                await MainActor.run {
+                    guard self.searchRequestID == requestID else { return }
+                    self.isSearchLoading = false
+                    self.searchErrorText = error.localizedDescription
+                    self.errorText = error.localizedDescription
+                }
             }
         }
     }
@@ -73,14 +85,17 @@ extension VestigoModel {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let requestID = UUID()
         searchRequestID = requestID
+        searchErrorText = nil
 
         guard !query.isEmpty else {
             searchResults = []
             searchPeopleResults = []
+            isSearchLoading = false
             return
         }
 
         searchTask?.cancel()
+        isSearchLoading = true
 
         do {
             let cacheKey = normalizedSearchCacheKey(query, filter: searchFilter)
@@ -90,12 +105,14 @@ extension VestigoModel {
                 peopleSearchCache[cacheKey] = people
                 searchPeopleResults = people
                 searchResults = []
+                isSearchLoading = false
             } else if let filter = searchFilter.mediaFilter {
                 let results = try await searchMediaResults(query: query, filter: filter)
                 guard searchRequestID == requestID else { return }
                 mediaSearchCache[cacheKey] = results
                 searchResults = results
                 searchPeopleResults = []
+                isSearchLoading = false
                 cacheUpcomingItems(from: results)
                 refreshSearchRatingsIfCurrent(
                     results,
@@ -108,6 +125,8 @@ extension VestigoModel {
             if LoadErrorFilter.shouldIgnore(error) {
                 return
             }
+            isSearchLoading = false
+            searchErrorText = error.localizedDescription
             errorText = error.localizedDescription
         }
     }

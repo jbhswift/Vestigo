@@ -34,6 +34,15 @@ interface RetentionStats {
   topFeaturesRetained: { event: string; name: string; count: number }[]
 }
 
+interface SentryData {
+  configured: boolean
+  latestVersion: string | null
+  crashes: number
+  crashedUsers: number
+  errors: number
+  feedback: number
+}
+
 interface ASCRetentionData {
   sessionsPerActiveDevice: number | null
   activeDevices30d: number | null
@@ -54,6 +63,7 @@ interface QuotaItem {
   resetsAt: string | null
   dataSource: 'live' | 'static'
   unconfigured?: boolean
+  hidden?: boolean
   note?: string
   dashboardUrl: string
 }
@@ -358,17 +368,19 @@ export default function Dashboard() {
   const [quotas, setQuotas] = useState<QuotaItem[]>([])
   const [retention, setRetention] = useState<RetentionStats | null>(null)
   const [ascRetention, setAscRetention] = useState<ASCRetentionData | null>(null)
+  const [sentryData, setSentryData] = useState<SentryData | null>(null)
   const [, setNow] = useState(Date.now())
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [statsRes, quotasRes, retentionRes, ascRes] = await Promise.all([
+      const [statsRes, quotasRes, retentionRes, ascRes, sentryRes] = await Promise.all([
         fetch(`/api/stats?range=${range}&dist=${dist}`),
         fetch('/api/quotas'),
         fetch(`/api/retention?range=${range}&dist=${dist}`),
         fetch('/api/asc-retention'),
+        fetch('/api/sentry'),
       ])
       if (!statsRes.ok) throw new Error(await statsRes.text())
       setData(await statsRes.json())
@@ -387,6 +399,9 @@ export default function Dashboard() {
         } else if (a.error) {
           setAscRetention({ sessionsPerActiveDevice: null, activeDevices30d: null, activeDevices7d: null, activeDevices1d: null, reportDate: null, error: a.error })
         }
+      }
+      if (sentryRes.ok) {
+        setSentryData(await sentryRes.json())
       }
       setLastUpdated(new Date())
     } catch (e) {
@@ -682,88 +697,121 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Sentry */}
+      {sentryData?.configured && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-zinc-300">
+              Sentry
+              {sentryData.latestVersion && (
+                <span className="text-zinc-500 font-normal text-sm ml-2">— {sentryData.latestVersion}</span>
+              )}
+            </h2>
+            <a href="https://sentry.io" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300">
+              Sentry →
+            </a>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className={`card flex flex-col gap-1 ${sentryData.crashes > 0 ? 'border border-red-800/50 bg-red-950/10' : ''}`}>
+              <p className="text-xs text-zinc-400 uppercase tracking-wider">Crashes</p>
+              <p className={`text-3xl font-semibold tabular-nums ${sentryData.crashes > 0 ? 'text-red-400' : 'text-zinc-200'}`}>
+                {loading ? '—' : sentryData.crashes.toLocaleString()}
+              </p>
+              <p className="text-xs text-zinc-500">
+                {sentryData.crashes > 0
+                  ? `${sentryData.crashedUsers.toLocaleString()} ${sentryData.crashedUsers === 1 ? 'person' : 'people'} affected`
+                  : 'no crashes on this version'}
+              </p>
+            </div>
+            <SummaryCard
+              label="Total Errors"
+              value={loading ? '—' : sentryData.errors.toLocaleString()}
+              sub="all issue types, latest version"
+            />
+            <SummaryCard
+              label="User Feedback"
+              value={loading ? '—' : sentryData.feedback.toLocaleString()}
+              sub="via Sentry feedback"
+            />
+          </div>
+        </div>
+      )}
+
       {/* API Quotas */}
-      {quotas.length > 0 && (
+      {quotas.filter(q => !q.hidden).length > 0 && (
         <div>
           <h2 className="text-base font-semibold text-zinc-300 mb-3">API Quotas</h2>
-          <div className="card overflow-hidden p-0 overflow-x-auto">
-            <table className="w-full text-sm min-w-[600px]">
-              <thead>
-                <tr className="border-b border-zinc-800">
-                  <th className="text-left text-xs text-zinc-500 font-medium uppercase tracking-wider px-4 py-2.5">API</th>
-                  <th className="text-right text-xs text-zinc-500 font-medium uppercase tracking-wider px-4 py-2.5">Limit</th>
-                  <th className="text-right text-xs text-zinc-500 font-medium uppercase tracking-wider px-4 py-2.5">Per</th>
-                  <th className="text-left text-xs text-zinc-500 font-medium uppercase tracking-wider px-4 py-2.5 w-48">Used this period</th>
-                  <th className="text-right text-xs text-zinc-500 font-medium uppercase tracking-wider px-4 py-2.5">All-time</th>
-                  <th className="text-right text-xs text-zinc-500 font-medium uppercase tracking-wider px-4 py-2.5">Resets in</th>
-                  <th className="text-right text-xs text-zinc-500 font-medium uppercase tracking-wider px-4 py-2.5"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {quotas.map((q, i) => {
-                  const pct = q.used != null && q.limit != null ? Math.min(100, (q.used / q.limit) * 100) : null
-                  const barColor = pct == null ? '#3f3f46' : pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e'
-                  const isStrained = pct != null && pct >= 70
-                  return (
-                    <tr key={q.key} className={`border-b border-zinc-800/50 last:border-0 ${isStrained ? 'bg-amber-950/10' : ''}`}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-medium ${isStrained ? 'text-amber-300' : 'text-zinc-200'}`}>{q.name}</span>
-                          {q.dataSource === 'live' && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-400 font-medium">live</span>
-                          )}
-                          {q.unconfigured && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 font-medium">no key</span>
-                          )}
-                        </div>
-                        {q.note && <p className="text-[11px] text-zinc-500 mt-0.5">{q.note}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-zinc-200">
-                        {q.limit != null ? fmtLimit(q.limit, q.limitUnit) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-zinc-400">{q.period}</td>
-                      <td className="px-4 py-3">
-                        {q.used != null ? (
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center justify-between">
-                              <span className="tabular-nums text-zinc-200">{fmtUsed(q.used, q.limitUnit)}</span>
-                              {pct != null && (
-                                <span className="text-[11px] tabular-nums" style={{ color: barColor }}>
-                                  {pct < 1 ? '<1%' : `${Math.round(pct)}%`}
-                                </span>
-                              )}
-                            </div>
-                            {pct != null && (
-                              <div className="h-1 bg-zinc-800 rounded-full overflow-hidden w-36">
-                                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor }} />
-                              </div>
-                            )}
-                          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {quotas.filter(q => !q.hidden).map((q) => {
+              const usedPct = q.used != null && q.limit != null ? Math.min(100, (q.used / q.limit) * 100) : null
+              const barColor = usedPct == null ? '#52525b' : usedPct >= 90 ? '#ef4444' : usedPct >= 70 ? '#f59e0b' : '#22c55e'
+              const isStrained = usedPct != null && usedPct >= 70
+              return (
+                <div key={q.key} className={`card flex flex-col gap-3 ${isStrained ? 'border border-amber-800/40 bg-amber-950/10' : ''}`}>
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`text-sm font-semibold truncate ${isStrained ? 'text-amber-300' : 'text-zinc-200'}`}>{q.name}</span>
+                      {q.dataSource === 'live' && !q.unconfigured && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-400 font-medium shrink-0">live</span>
+                      )}
+                      {q.unconfigured && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 font-medium shrink-0">no key</span>
+                      )}
+                    </div>
+                    <a
+                      href={q.dashboardUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-indigo-400 hover:text-indigo-300 shrink-0 ml-2"
+                    >
+                      →
+                    </a>
+                  </div>
+
+                  {/* Usage number + bar */}
+                  {q.used != null ? (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-xl font-semibold tabular-nums text-zinc-100">{fmtUsed(q.used, q.limitUnit)}</span>
+                        {usedPct != null ? (
+                          <span className="text-sm tabular-nums font-medium" style={{ color: barColor }}>
+                            {usedPct < 1 ? '<1%' : `${Math.round(usedPct)}%`}
+                          </span>
                         ) : (
-                          <span className="text-zinc-600">—</span>
+                          <span className="text-xs text-zinc-600">no limit</span>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-zinc-400">
-                        {q.allTime != null ? q.allTime.toLocaleString() : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-zinc-400">
-                        {q.resetsAt ? countdown(q.resetsAt) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <a
-                          href={q.dashboardUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-indigo-400 hover:text-indigo-300"
-                        >
-                          →
-                        </a>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                      </div>
+                      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        {usedPct != null ? (
+                          <div className="h-full rounded-full transition-all" style={{ width: `${usedPct}%`, background: barColor }} />
+                        ) : (
+                          <div className="h-full w-4 rounded-full bg-zinc-600" />
+                        )}
+                      </div>
+                      {q.limit != null && (
+                        <p className="text-xs text-zinc-500">of {fmtLimit(q.limit, q.limitUnit)} / {q.period}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xl font-semibold text-zinc-600">—</span>
+                      {q.limit != null && (
+                        <p className="text-xs text-zinc-600">limit: {fmtLimit(q.limit, q.limitUnit)} / {q.period}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Footer: reset + note */}
+                  <div className="flex items-end justify-between gap-2 mt-auto">
+                    {q.note && <p className="text-[11px] text-zinc-500 leading-snug">{q.note}</p>}
+                    {q.resetsAt && (
+                      <p className="text-[11px] text-zinc-600 shrink-0 ml-auto">resets {countdown(q.resetsAt)}</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

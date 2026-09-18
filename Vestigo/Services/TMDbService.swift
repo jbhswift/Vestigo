@@ -87,6 +87,11 @@ struct TMDbService {
         }
     }
 
+    func recommendations(for item: MediaItem) async throws -> [MediaItem] {
+        let mediaType = item.kind == .tv ? "tv" : "movie"
+        return try await fetchList(path: "/\(mediaType)/\(item.id)/recommendations", query: [])
+    }
+
     func search(query: String, filter: MediaFilter, includeAdult: Bool = false) async throws -> [MediaItem] {
         let path = filter == .both ? "/search/multi" : "/search/\(filter.tmdbPath)"
         return try await fetchList(path: path, query: [
@@ -176,7 +181,21 @@ struct TMDbService {
         guard let url = comps.url else { throw URLError(.badURL) }
         let (data, response) = try await URLSession.shared.data(from: url)
         AnalyticsService.shared.track(.apiCallMade(service: "tmdb"))
-        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) { throw URLError(.badServerResponse) }
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            let body = String(data: data, encoding: .utf8) ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
+            throw TMDbServiceError.requestFailed(statusCode: http.statusCode, message: body)
+        }
         return try JSONDecoder().decode(T.self, from: data)
+    }
+}
+
+enum TMDbServiceError: LocalizedError {
+    case requestFailed(statusCode: Int, message: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .requestFailed(let statusCode, let message):
+            return "TMDb request failed (\(statusCode)): \(message)"
+        }
     }
 }

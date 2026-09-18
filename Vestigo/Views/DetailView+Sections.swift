@@ -288,6 +288,42 @@ extension DetailView {
         }
     }
 
+    // MARK: Featured on profile
+
+    @ViewBuilder var featuredSection: some View {
+        if model.friendDetailContext == nil {
+            let featured = model.isFeatured(item)
+            let icon = item.isUpcoming
+                ? (featured ? "bolt.heart.fill" : "bolt.heart")
+                : (featured ? "pin.fill" : "pin")
+            let label = item.isUpcoming
+                ? (featured ? "Excited For" : "Add to Excited For")
+                : (featured ? "Featured on profile" : "Feature on profile")
+            let tint: Color = item.isUpcoming ? .orange : model.settings.accentColor
+
+            Button {
+                model.toggleFeatured(item)
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: icon)
+                        .font(.headline.bold())
+                        .foregroundStyle(featured ? tint : .primary)
+
+                    Text(label)
+                        .font(.headline.bold())
+
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 14)
+                .frame(height: 46)
+                .liquidGlass(cornerRadius: 22)
+                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     // MARK: Overview + Action
 
     var overviewSection: some View {
