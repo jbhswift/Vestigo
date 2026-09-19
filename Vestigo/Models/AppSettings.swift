@@ -47,10 +47,9 @@ struct AppSettings: Codable, Hashable {
     var socialProcessedRequestIDs: [String] = []
     var socialProcessedRemovalIDs: [String] = []
     var socialMyRecordName: String = ""
-    var forYouCarouselOrder: [ForYouCarousel] = ForYouCarousel.allCases
-    var forYouCarouselHidden: Set<ForYouCarousel> = [.moreLikeLast, .moreLikeFavourite, .watchlistPicks, .seriesNext]
+    var recommendationCarouselOrder: [RecommendationCarousel] = RecommendationCarousel.allCases
+    var recommendationCarouselHidden: Set<RecommendationCarousel> = [.moreLikeLast, .moreLikeFavourite, .watchlistPicks, .seriesNext]
     var omdbPrimaryKey: String = ""
-    var omdbBackupKey: String = ""
     var omdbTierLimit: Int = 1_000
     var omdbDailyRequestCount: Int = 0
     var omdbTotalRequestCount: Int = 0
@@ -99,10 +98,9 @@ struct AppSettings: Codable, Hashable {
         case preferredRatingSource
         case homeCarouselOrder
         case homeCarouselHidden
-        case forYouCarouselOrder
-        case forYouCarouselHidden
+        case recommendationCarouselOrder = "forYouCarouselOrder"
+        case recommendationCarouselHidden = "forYouCarouselHidden"
         case omdbPrimaryKey
-        case omdbBackupKey
         case omdbTierLimit
         case omdbDailyRequestCount
         case omdbTotalRequestCount
@@ -177,14 +175,13 @@ struct AppSettings: Codable, Hashable {
         homeCarouselOrder = mergedHomeOrder
         homeCarouselHidden = try container.decodeIfPresent(Set<HomeCarousel>.self, forKey: .homeCarouselHidden) ?? homeCarouselHidden
 
-        let savedForYouOrder = ((try? container.decodeIfPresent([String].self, forKey: .forYouCarouselOrder)) ?? [])
-            .compactMap(ForYouCarousel.init(rawValue:))
-        forYouCarouselOrder = Self.mergedOrder(saved: savedForYouOrder, defaults: ForYouCarousel.allCases)
-        let savedForYouHidden = ((try? container.decodeIfPresent([String].self, forKey: .forYouCarouselHidden)) ?? [])
-            .compactMap(ForYouCarousel.init(rawValue:))
-        forYouCarouselHidden = savedForYouHidden.isEmpty ? forYouCarouselHidden : Set(savedForYouHidden)
+        let savedRecOrder = ((try? container.decodeIfPresent([String].self, forKey: .recommendationCarouselOrder)) ?? [])
+            .compactMap(RecommendationCarousel.init(rawValue:))
+        recommendationCarouselOrder = Self.mergedOrder(saved: savedRecOrder, defaults: RecommendationCarousel.allCases)
+        let savedRecHidden = ((try? container.decodeIfPresent([String].self, forKey: .recommendationCarouselHidden)) ?? [])
+            .compactMap(RecommendationCarousel.init(rawValue:))
+        recommendationCarouselHidden = savedRecHidden.isEmpty ? recommendationCarouselHidden : Set(savedRecHidden)
         omdbPrimaryKey = try container.decodeIfPresent(String.self, forKey: .omdbPrimaryKey) ?? omdbPrimaryKey
-        omdbBackupKey = try container.decodeIfPresent(String.self, forKey: .omdbBackupKey) ?? omdbBackupKey
         omdbTierLimit = try container.decodeIfPresent(Int.self, forKey: .omdbTierLimit) ?? omdbTierLimit
         omdbDailyRequestCount = try container.decodeIfPresent(Int.self, forKey: .omdbDailyRequestCount) ?? omdbDailyRequestCount
         omdbTotalRequestCount = try container.decodeIfPresent(Int.self, forKey: .omdbTotalRequestCount) ?? omdbTotalRequestCount

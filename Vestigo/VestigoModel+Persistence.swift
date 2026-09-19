@@ -26,10 +26,10 @@ extension VestigoModel {
             settings.homeCarouselOrder.insert(.recommendations, at: insertAt)
         }
 
-        // Ensure all non-forYou sub-carousels are hidden by default for existing installs
-        let subCarousels: Set<ForYouCarousel> = [.moreLikeLast, .moreLikeFavourite, .watchlistPicks, .seriesNext]
-        if settings.forYouCarouselHidden.isDisjoint(with: subCarousels) {
-            settings.forYouCarouselHidden.formUnion(subCarousels)
+        // Ensure all recommendation sub-carousels are hidden by default for existing installs
+        let subCarousels: Set<RecommendationCarousel> = [.moreLikeLast, .moreLikeFavourite, .watchlistPicks, .seriesNext]
+        if settings.recommendationCarouselHidden.isDisjoint(with: subCarousels) {
+            settings.recommendationCarouselHidden.formUnion(subCarousels)
         }
     }
 
@@ -104,6 +104,7 @@ extension VestigoModel {
         }
         let diagnostic = await publicSync.publishProfile(settings: settings, library: library, avatarData: userAvatarData)
         publishDiagnostic = diagnostic
+        lastProfilePublish = Date()
     }
 
     func saveLocalSoon() {

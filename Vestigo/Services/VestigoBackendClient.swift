@@ -178,7 +178,7 @@ actor VestigoBackendClient {
         return decoded.collection?.mediaItems ?? []
     }
 
-    func ratings(for item: MediaItem, primaryKey: String = "", backupKey: String = "") async throws -> ExternalRatings? {
+    func ratings(for item: MediaItem, userKey: String = "") async throws -> ExternalRatings? {
         guard item.kind == .movie || item.kind == .tv else { return nil }
 
         let releaseYear = item.releaseDate.flatMap { releaseDate -> String? in
@@ -193,8 +193,7 @@ actor VestigoBackendClient {
             URLQueryItem(name: "title", value: item.title),
             URLQueryItem(name: "year", value: releaseYear)
         ]
-        if !primaryKey.isEmpty { queryItems.append(URLQueryItem(name: "userKey", value: primaryKey)) }
-        if !backupKey.isEmpty { queryItems.append(URLQueryItem(name: "userBackupKey", value: backupKey)) }
+        if !userKey.isEmpty { queryItems.append(URLQueryItem(name: "userKey", value: userKey)) }
         components.queryItems = queryItems
 
         guard let url = components.url else { return nil }

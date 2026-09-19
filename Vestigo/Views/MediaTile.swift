@@ -98,6 +98,10 @@ struct MediaItemContextMenuActions: View {
     let showCollections: () -> Void
 
     var body: some View {
+        ShareLink(item: item.shareURL, subject: Text(item.title), message: Text("Check out \(item.title) on Vestigo")) {
+            Label("Share", systemImage: "square.and.arrow.up")
+        }
+
         Button {
             showCollections()
         } label: {

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 
 export const dynamic = 'force-dynamic'
@@ -122,37 +121,32 @@ export async function GET() {
     return null
   }
 
-  // ── OMDb (live via Supabase) ─────────────────────────────────────────────
+  // ── OMDb (patron plan — shared backend key, live count from PostHog) ───────
   try {
-    const supa =
-      process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-        ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-        : null
-    const { data } = supa
-      ? await supa
-          .from('omdb_usage_reports')
-          .select('daily_count, total_count, daily_limit')
-          .order('report_date', { ascending: false })
-          .limit(1)
-          .single()
-      : { data: null }
-
+    const todayStr = new Date().toISOString().split('T')[0]
+    const omdbRows = await hogql(`
+      SELECT count() AS calls
+      FROM events
+      WHERE event = 'external_rating_fetched'
+        AND toDate(timestamp) = '${todayStr}'
+    `)
+    const todayCount = omdbRows[0] ? Number(omdbRows[0][0]) : null
     quotas.push({
       key: 'omdb', name: 'OMDb',
-      limit: null, limitUnit: 'calls', period: 'day',
-      used: null, allTime: null,
+      limit: 100_000, limitUnit: 'calls', period: 'day',
+      used: todayCount, allTime: null,
       resetsAt: nextDailyReset(),
-      dataSource: 'static',
-      note: 'Currently per-user key — shared quota coming soon',
+      dataSource: 'live',
+      note: 'Patron plan — shared key for all users. Count from PostHog (all key sources).',
       dashboardUrl: 'https://www.omdbapi.com/apikey.aspx',
     })
   } catch {
     quotas.push({
       key: 'omdb', name: 'OMDb',
-      limit: null, limitUnit: 'calls', period: 'day',
+      limit: 100_000, limitUnit: 'calls', period: 'day',
       used: null, allTime: null, resetsAt: nextDailyReset(),
       dataSource: 'static',
-      note: 'Currently per-user key — shared quota coming soon',
+      note: 'Patron plan — shared key for all users.',
       dashboardUrl: 'https://www.omdbapi.com/apikey.aspx',
     })
   }

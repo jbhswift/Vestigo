@@ -100,6 +100,7 @@ final class VestigoModel: ObservableObject {
     @Published var userAvatarData: Data? = nil
     @Published var linkLog: [String] = []
     var lastIncomingCheck: Date = .distantPast
+    var lastProfilePublish: Date = .distantPast
 
     let tmdb = TMDbService()
     // TasteDive is intentionally disabled because the current recommendation system no longer calls it.

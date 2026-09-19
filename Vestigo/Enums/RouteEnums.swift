@@ -86,7 +86,7 @@ struct GenreDefinition: Identifiable, Hashable {
 
 enum HomeRoute: Hashable {
     case section(SectionRoute)
-    case forYouSection(ForYouSection)
+    case sectionDetail(HomeSectionDetail)
     case pickForMe
 }
 
@@ -105,12 +105,13 @@ enum HomeCarousel: String, Codable, CaseIterable, Identifiable, Hashable {
     }
 }
 
-enum ForYouCarousel: String, Codable, CaseIterable, Identifiable, Hashable {
-    case forYou, moreLikeLast, moreLikeFavourite, watchlistPicks, seriesNext
+enum RecommendationCarousel: String, Codable, CaseIterable, Identifiable, Hashable {
+    case personalized = "forYou"
+    case moreLikeLast, moreLikeFavourite, watchlistPicks, seriesNext
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .forYou: return "For you"
+        case .personalized: return "For you"
         case .moreLikeLast: return "More like recent watched"
         case .moreLikeFavourite: return "More like a favourite"
         case .watchlistPicks: return "From your watchlist"

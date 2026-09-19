@@ -106,6 +106,14 @@ struct UserLibrary: Codable {
         watchedEpisodes.contains(EpisodeKey(show: showKey, season: season, episode: episode))
     }
 
+    var currentlyWatchingItems: [MediaItem] {
+        let showKeysWithEpisodes = Set(watchedEpisodes.map { $0.show })
+        return showKeysWithEpisodes
+            .filter { !watched.contains($0) }
+            .compactMap { items[$0] }
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
     var favouriteItems: [MediaItem] {
         favouriteKeys.filter { watched.contains($0) }.compactMap { items[$0] }
     }

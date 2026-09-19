@@ -82,9 +82,16 @@ struct CloudPublicSyncService {
                 if !datesDict.isEmpty, let data = try? JSONEncoder().encode(datesDict) {
                     record["watchedDatesPayload"] = CKAsset(fileURL: try writeTemp(data, name: "watchedDates"))
                 }
+                let currentlyWatching = library.currentlyWatchingItems
+                if !currentlyWatching.isEmpty, let data = try? JSONEncoder().encode(currentlyWatching) {
+                    record["currentlyWatchingPayload"] = CKAsset(fileURL: try writeTemp(data, name: "currentlyWatching"))
+                } else {
+                    record["currentlyWatchingPayload"] = nil as CKAsset?
+                }
             } else {
                 record["watchedPayload"] = nil as CKAsset?
                 record["watchedDatesPayload"] = nil as CKAsset?
+                record["currentlyWatchingPayload"] = nil as CKAsset?
             }
 
             if let avatarData {
@@ -103,6 +110,7 @@ struct CloudPublicSyncService {
                 record["inviteID"] = nil as String?
                 record["ratingsPayload"] = nil as CKAsset?
                 record["watchedDatesPayload"] = nil as CKAsset?
+                record["currentlyWatchingPayload"] = nil as CKAsset?
                 _ = try await publicDB.save(record)
                 return "publish OK (schema limited) · name: \(settings.name)"
             }
@@ -325,6 +333,12 @@ struct CloudPublicSyncService {
             watchedDates = rawDates.mapValues { Date(timeIntervalSince1970: $0) }
         }
 
+        var currentlyWatchingItems: [MediaItem] = []
+        if sharesWatched, let asset = record["currentlyWatchingPayload"] as? CKAsset,
+           let url = asset.fileURL, let data = try? Data(contentsOf: url) {
+            currentlyWatchingItems = (try? JSONDecoder().decode([MediaItem].self, from: data)) ?? []
+        }
+
         return FriendProfile(
             id: record.recordID.recordName,
             name: name,
@@ -338,7 +352,8 @@ struct CloudPublicSyncService {
             watchedItems: watchedItems,
             ratings: ratings,
             favouriteKeys: favouriteKeys,
-            watchedDates: watchedDates
+            watchedDates: watchedDates,
+            currentlyWatchingItems: currentlyWatchingItems
         )
     }
     #endif

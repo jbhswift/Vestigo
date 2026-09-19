@@ -5,7 +5,7 @@ struct CarouselOrderContent: View {
     @ObservedObject var model: VestigoModel
 
     private var totalRowCount: Int {
-        model.settings.homeCarouselOrder.count + model.settings.forYouCarouselOrder.count
+        model.settings.homeCarouselOrder.count + model.settings.recommendationCarouselOrder.count
     }
 
     var body: some View {
@@ -31,16 +31,16 @@ struct CarouselOrderContent: View {
                 model.settings.homeCarouselOrder.move(fromOffsets: indices, toOffset: newOffset)
             }
 
-            ForEach(model.settings.forYouCarouselOrder, id: \.self) { carousel in
+            ForEach(model.settings.recommendationCarouselOrder, id: \.self) { carousel in
                 CarouselOrderRow(
                     title: carousel.title,
-                    isHidden: model.settings.forYouCarouselHidden.contains(carousel),
+                    isHidden: model.settings.recommendationCarouselHidden.contains(carousel),
                     accentColor: model.settings.accentColor,
                     toggle: {
-                        if model.settings.forYouCarouselHidden.contains(carousel) {
-                            model.settings.forYouCarouselHidden.remove(carousel)
+                        if model.settings.recommendationCarouselHidden.contains(carousel) {
+                            model.settings.recommendationCarouselHidden.remove(carousel)
                         } else {
-                            model.settings.forYouCarouselHidden.insert(carousel)
+                            model.settings.recommendationCarouselHidden.insert(carousel)
                         }
                     }
                 )
@@ -49,7 +49,7 @@ struct CarouselOrderContent: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
             }
             .onMove { indices, newOffset in
-                model.settings.forYouCarouselOrder.move(fromOffsets: indices, toOffset: newOffset)
+                model.settings.recommendationCarouselOrder.move(fromOffsets: indices, toOffset: newOffset)
             }
         }
         .listStyle(.plain)

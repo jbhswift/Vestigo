@@ -22,7 +22,7 @@ extension VestigoModel {
 
         if library.isWatched(item.key) {
             if settings.autoTrackWatchDate { library.setWatchedDateIfUnset(for: item.key) }
-            removeFromForYouRecommendations(item)
+            removeFromRecommendations(item)
         }
         if library.isWatched(item.key) {
             removeFromCollectionRecommendations(item)
@@ -154,7 +154,7 @@ extension VestigoModel {
         scheduleRecommendationsRefresh()
     }
 
-    func removeFromForYouRecommendations(_ item: MediaItem) {
+    func removeFromRecommendations(_ item: MediaItem) {
         recommendations.removeAll { $0.key == item.key }
         moreLikeLastWatched.removeAll { $0.key == item.key }
         moreLikeFavourite.removeAll { $0.key == item.key }
@@ -298,7 +298,7 @@ extension VestigoModel {
         library.toggleNeverShowAgain(item)
 
         if library.isNeverShowAgain(item.key) {
-            removeFromForYouRecommendations(item)
+            removeFromRecommendations(item)
         }
 
         saveLocalSoon()
@@ -311,7 +311,7 @@ extension VestigoModel {
         library.toggleNotInterested(item)
 
         if library.isNotInterested(item.key) {
-            removeFromForYouRecommendations(item)
+            removeFromRecommendations(item)
         }
 
         saveLocalSoon()

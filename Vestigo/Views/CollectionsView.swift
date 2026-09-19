@@ -130,6 +130,36 @@ struct CollectionsView: View {
                 }
             ) {
                 VStack(spacing: 16) {
+                    NavigationLink {
+                        WatchedLibraryView(model: model)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 18, weight: .bold))
+                                .frame(width: 26)
+
+                            Text("Watched")
+                                .font(.headline.bold())
+                                .foregroundStyle(.primary)
+
+                            Spacer(minLength: 0)
+
+                            Text("\(model.library.watched.count)")
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity)
+                        .liquidGlass(cornerRadius: 22)
+                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
                     Picker("", selection: $tab) {
                         ForEach(CollectionsTab.allCases, id: \.self) { t in
                             Text(t.rawValue).tag(t)

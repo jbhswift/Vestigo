@@ -19,7 +19,7 @@ enum AnalyticsEvent {
     case collectionBrowsed
     case trailerOpened
     case streamingChecked
-    case externalRatingFetched
+    case externalRatingFetched(keySource: String)
     case apiCallMade(service: String)
 }
 
@@ -54,8 +54,8 @@ private extension AnalyticsEvent {
             return ("trailer_opened", nil)
         case .streamingChecked:
             return ("streaming_checked", nil)
-        case .externalRatingFetched:
-            return ("external_rating_fetched", nil)
+        case .externalRatingFetched(let keySource):
+            return ("external_rating_fetched", ["key_source": keySource])
         case .apiCallMade(let service):
             return ("api_call", ["service": service])
         }

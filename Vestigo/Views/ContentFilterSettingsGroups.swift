@@ -53,12 +53,6 @@ struct ShortFilmsSettingsGroup: View {
                 .tint(model.settings.accentColor)
                 .padding(.trailing, 6)
 
-            Toggle("Hide from For You", isOn: $model.settings.hideShortFilmsFromRecommended)
-                .font(.subheadline.bold())
-                .foregroundStyle(.primary)
-                .tint(model.settings.accentColor)
-                .padding(.trailing, 6)
-
             Toggle("Hide from Collection Recommendations", isOn: $model.settings.hideShortFilmsFromCollectionRecommendations)
                 .font(.subheadline.bold())
                 .foregroundStyle(.primary)
@@ -131,12 +125,6 @@ struct ExtrasAndPromosSettingsGroup: View {
                 .padding(.trailing, 6)
 
             Toggle("Hide from Search", isOn: $model.settings.hideExtrasAndPromosFromSearch)
-                .font(.subheadline.bold())
-                .foregroundStyle(.primary)
-                .tint(model.settings.accentColor)
-                .padding(.trailing, 6)
-
-            Toggle("Hide from For You", isOn: $model.settings.hideExtrasAndPromosFromRecommended)
                 .font(.subheadline.bold())
                 .foregroundStyle(.primary)
                 .tint(model.settings.accentColor)

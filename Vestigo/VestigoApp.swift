@@ -13,8 +13,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         application.shortcutItems = [
             UIApplicationShortcutItem(type: "openWatchlist", localizedTitle: "Watchlist", localizedSubtitle: nil, icon: UIApplicationShortcutIcon(systemImageName: "bookmark"), userInfo: nil),
             UIApplicationShortcutItem(type: "openSearch", localizedTitle: "Search", localizedSubtitle: nil, icon: UIApplicationShortcutIcon(systemImageName: "magnifyingglass"), userInfo: nil),
-            UIApplicationShortcutItem(type: "openForYou", localizedTitle: "For You", localizedSubtitle: nil, icon: UIApplicationShortcutIcon(systemImageName: "sparkles"), userInfo: nil),
-            UIApplicationShortcutItem(type: "openPickForMe", localizedTitle: "Pick For Me", localizedSubtitle: nil, icon: UIApplicationShortcutIcon(systemImageName: "dice"), userInfo: nil),
+UIApplicationShortcutItem(type: "openPickForMe", localizedTitle: "Pick For Me", localizedSubtitle: nil, icon: UIApplicationShortcutIcon(systemImageName: "dice"), userInfo: nil),
         ]
         return true
     }
@@ -85,16 +84,6 @@ struct VestigoAppShortcuts: AppShortcutsProvider {
             systemImageName: "bookmark.slash"
         )
         AppShortcut(
-            intent: GetRecentlyWatchedInVestigoIntent(),
-            phrases: [
-                "What did I recently watch in \(.applicationName)",
-                "Show my recent \(.applicationName) watches",
-                "What have I been watching in \(.applicationName)"
-            ],
-            shortTitle: "Recently Watched",
-            systemImageName: "clock"
-        )
-        AppShortcut(
             intent: CheckVestigoItemStatusIntent(),
             phrases: [
                 "Have I watched something in \(.applicationName)",
@@ -141,6 +130,16 @@ struct VestigoAppShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Add to Watchlist",
             systemImageName: "bookmark.badge.plus"
+        )
+        AppShortcut(
+            intent: OpenPickForMeInVestigoIntent(),
+            phrases: [
+                "Open Pick For Me in \(.applicationName)",
+                "Open \(.applicationName) Pick For Me",
+                "Pick something for me in \(.applicationName)"
+            ],
+            shortTitle: "Open Pick For Me",
+            systemImageName: "dice"
         )
     }
 }

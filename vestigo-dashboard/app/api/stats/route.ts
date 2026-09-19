@@ -199,9 +199,13 @@ export async function GET(request: NextRequest) {
         WHERE timestamp >= now() - INTERVAL ${range} DAY ${distFilter}
       `),
 
-      // OMDb: count external_rating_fetched events per day for quota tracking
+      // OMDb: count external_rating_fetched events per day, split by key source
       hogql(`
-        SELECT toDate(timestamp) AS day, count() AS calls
+        SELECT
+          toDate(timestamp) AS day,
+          count() AS total_calls,
+          countIf(properties.key_source = 'backend') AS backend_calls,
+          countIf(properties.key_source = 'user') AS user_calls
         FROM events
         WHERE event = 'external_rating_fetched'
           AND timestamp >= now() - INTERVAL ${range} DAY
@@ -243,7 +247,12 @@ export async function GET(request: NextRequest) {
       total: Number(total),
     }))
     const [totalUsers, totalSessions, totalEvents] = summaryRows[0] ?? [0, 0, 0]
-    const omdbDaily = omdbRows.map(([day, count]) => ({ day, count: Number(count) }))
+    const omdbDaily = omdbRows.map(([day, total, backend, user]) => ({
+      day,
+      count: Number(total),
+      backendCount: Number(backend),
+      userCount: Number(user),
+    }))
     const recentUsers = recentUsersRows.map(([distinct_id, first_seen, distribution]) => ({
       distinct_id: String(distinct_id),
       first_seen: String(first_seen),
@@ -260,11 +269,14 @@ export async function GET(request: NextRequest) {
     // OpenRouter calls: Describe It only — Pick For Me is a client-side archetypal system
     const groqTotal = features.find((f) => f.event === 'describe_it_used')?.total ?? 0
 
-    // OMDb total from external_rating_fetched events
+    // OMDb totals from external_rating_fetched events (app-wide, all key sources)
     const omdbTotal = omdbDaily.reduce((sum, d) => sum + d.count, 0)
-    const omdbToday = omdbDaily.find((d) => d.day === new Date().toISOString().split('T')[0])?.count ?? 0
+    const omdbBackendTotal = omdbDaily.reduce((sum, d) => sum + d.backendCount, 0)
+    const omdbUserTotal = omdbDaily.reduce((sum, d) => sum + d.userCount, 0)
+    const todayStr = new Date().toISOString().split('T')[0]
+    const omdbToday = omdbDaily.find((d) => d.day === todayStr)?.count ?? 0
 
-    // Supabase OMDb report (if migration has been applied)
+    // Supabase OMDb report — only populated by users who have set a personal override key in dev settings
     let supabaseOmdb: { report_date: string; daily_count: number; total_count: number; daily_limit: number } | null = null
     try {
       const supabaseUrl = process.env.SUPABASE_URL
@@ -301,8 +313,10 @@ export async function GET(request: NextRequest) {
         omdb: {
           todayEstimate: omdbToday,
           periodTotal: omdbTotal,
+          backendKeyTotal: omdbBackendTotal,
+          userKeyTotal: omdbUserTotal,
           daily: omdbDaily,
-          // More precise values from Supabase if available
+          // User override key reports (only populated when a user has set their own key in dev settings)
           supabase: supabaseOmdb,
         },
         groq: {

@@ -8,7 +8,6 @@ import UIKit
 
 struct HomeView: View {
     @ObservedObject var model: VestigoModel
-    @State private var omdbCalloutDismissed = false
 
     private var recentWatchedItem: MediaItem? {
         model.library.lastWatchedItem
@@ -19,7 +18,7 @@ struct HomeView: View {
     }
 
     private var watchlistPicks: [MediaItem] {
-        filteredForYou(model.library.watchlistItems)
+        filteredRecommendations(model.library.watchlistItems)
             .sorted(
                 using: .tmdbRating,
                 ratings: model.library.ratings,
@@ -54,46 +53,6 @@ struct HomeView: View {
             }
         ) {
             VStack(spacing: 22) {
-                if !omdbCalloutDismissed
-                    && model.settings.preferredRatingSource == .imdb
-                    && model.settings.omdbPrimaryKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    HStack(spacing: 12) {
-                        Image(systemName: "key.fill")
-                            .font(.title3)
-                            .foregroundStyle(model.settings.accentColor)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Add your OMDb key for IMDb ratings")
-                                .font(.subheadline.bold())
-                            Text("Without a key, scores fall back to TMDb.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        VStack(spacing: 6) {
-                            Button {
-                                omdbCalloutDismissed = true
-                                model.homePath.append(.section(.settings))
-                            } label: {
-                                Text("Set Up")
-                                    .font(.caption.bold())
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(model.settings.accentColor, in: Capsule())
-                                    .foregroundStyle(.white)
-                            }
-                            Button {
-                                omdbCalloutDismissed = true
-                            } label: {
-                                Text("Dismiss")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .padding(14)
-                    .liquidGlass(cornerRadius: 24)
-                }
-
                 if let error = model.errorText {
                     StatusBubble(title: "Load error", text: error)
                 }
@@ -114,7 +73,7 @@ struct HomeView: View {
                 Button {
                     model.homePath.append(.pickForMe)
                 } label: {
-                    Label("Pick for me", systemImage: "sparkles")
+                    Label("Pick For Me", systemImage: "sparkles")
                         .font(.headline.bold())
                         .padding(.horizontal, 16)
                         .frame(height: 46)
@@ -147,42 +106,42 @@ struct HomeView: View {
                 })
             }
         case .recommendations:
-            ForEach(model.settings.forYouCarouselOrder, id: \.self) { fyCarousel in
-                if !model.settings.forYouCarouselHidden.contains(fyCarousel) {
-                    forYouCarouselView(for: fyCarousel)
+            ForEach(model.settings.recommendationCarouselOrder, id: \.self) { recCarousel in
+                if !model.settings.recommendationCarouselHidden.contains(recCarousel) {
+                    recommendationCarouselView(for: recCarousel)
                 }
             }
         }
     }
 
     @ViewBuilder
-    private func forYouCarouselView(for carousel: ForYouCarousel) -> some View {
+    private func recommendationCarouselView(for carousel: RecommendationCarousel) -> some View {
         switch carousel {
-        case .forYou:
-            let sectionItems = filteredForYou(model.recommendations)
+        case .personalized:
+            let sectionItems = filteredRecommendations(model.recommendations)
             if !sectionItems.isEmpty {
                 let sectionTitle = "For you"
                 MediaSection(title: sectionTitle, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
-                    model.homePath.append(.forYouSection(ForYouSection(title: sectionTitle, items: sectionItems)))
+                    model.homePath.append(.sectionDetail(HomeSectionDetail(title: sectionTitle, items: sectionItems)))
                 })
             }
         case .moreLikeLast:
             if let recentWatchedItem {
-                let sectionItems = filteredForYou(model.moreLikeLastWatched)
+                let sectionItems = filteredRecommendations(model.moreLikeLastWatched)
                 if !sectionItems.isEmpty {
                     let sectionTitle = "More like \(recentWatchedItem.title)"
                     MediaSection(title: sectionTitle, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
-                        model.homePath.append(.forYouSection(ForYouSection(title: sectionTitle, items: sectionItems)))
+                        model.homePath.append(.sectionDetail(HomeSectionDetail(title: sectionTitle, items: sectionItems)))
                     })
                 }
             }
         case .moreLikeFavourite:
             if let favouriteItem {
-                let sectionItems = filteredForYou(model.moreLikeFavourite)
+                let sectionItems = filteredRecommendations(model.moreLikeFavourite)
                 if !sectionItems.isEmpty {
                     let sectionTitle = "More like a favourite \(favouriteItem.kind.label.lowercased()): \(favouriteItem.title)"
                     MediaSection(title: sectionTitle, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
-                        model.homePath.append(.forYouSection(ForYouSection(title: sectionTitle, items: sectionItems)))
+                        model.homePath.append(.sectionDetail(HomeSectionDetail(title: sectionTitle, items: sectionItems)))
                     })
                 }
             }
@@ -191,21 +150,21 @@ struct HomeView: View {
                 let sectionTitle = "From your watchlist"
                 let sectionItems = watchlistPicks
                 MediaSection(title: sectionTitle, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
-                    model.homePath.append(.forYouSection(ForYouSection(title: sectionTitle, items: sectionItems)))
+                    model.homePath.append(.sectionDetail(HomeSectionDetail(title: sectionTitle, items: sectionItems)))
                 })
             }
         case .seriesNext:
-            let sectionItems = filteredForYou(model.seriesNext)
+            let sectionItems = filteredRecommendations(model.seriesNext)
             if !sectionItems.isEmpty {
                 let sectionTitle = "Continue with related series"
                 MediaSection(title: sectionTitle, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
-                    model.homePath.append(.forYouSection(ForYouSection(title: sectionTitle, items: sectionItems)))
+                    model.homePath.append(.sectionDetail(HomeSectionDetail(title: sectionTitle, items: sectionItems)))
                 })
             }
         }
     }
 
-    private func filteredForYou(_ items: [MediaItem]) -> [MediaItem] {
+    private func filteredRecommendations(_ items: [MediaItem]) -> [MediaItem] {
         items.filter { item in
             if model.library.isWatched(item.key) { return false }
             if model.settings.hideUpcomingFromRecommended && item.isUpcoming { return false }

@@ -52,6 +52,10 @@ struct FriendDetailPage: View {
                     SocialPosterRow(title: "Excited For", items: current.excitedForItems, showRating: false, friendContext: current, model: model)
                 }
 
+                if !current.currentlyWatchingItems.isEmpty {
+                    SocialPosterRow(title: "Currently Watching", items: current.currentlyWatchingItems, showRating: false, friendContext: current, model: model)
+                }
+
                 VStack(spacing: 0) {
                     if current.sharesWatchlist {
                         Button { onWatchlist() } label: {

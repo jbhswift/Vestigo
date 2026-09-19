@@ -3,6 +3,21 @@ import Foundation
 
 extension VestigoModel {
 
+    func handleMediaLink(id: Int, kind: MediaKind) async {
+        // Small delay so the view hierarchy is ready on a cold launch before presenting the sheet.
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        do {
+            let item = try await tmdb.item(for: MediaKey(id: id, kind: kind))
+            selectedItem = item
+        } catch {
+            // If the guessed kind was wrong, try the other one.
+            let fallback: MediaKind = kind == .movie ? .tv : .movie
+            if let item = try? await tmdb.item(for: MediaKey(id: id, kind: fallback)) {
+                selectedItem = item
+            }
+        }
+    }
+
     func loadBasicDetailIfNeeded(_ item: MediaItem) async {
         guard detailsCache[item.key] == nil else { return }
         do {
@@ -366,30 +381,30 @@ extension VestigoModel {
     */
 
     func loadExternalRatings(_ item: MediaItem, priority: Bool = false) async {
-        guard settings.preferredRatingSource == .imdb else { return }
         guard item.kind == .movie || item.kind == .tv else { return }
         guard externalRatingsCache[item.key] == nil else { return }
         guard !externalRatingInFlight.contains(item.key) else { return }
 
         let primaryKey = settings.omdbPrimaryKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let backupKey = settings.omdbBackupKey.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !primaryKey.isEmpty || !backupKey.isEmpty else {
-            externalRatingsCache[item.key] = .empty
-            saveLocalSoon()
-            return
-        }
+        let hasUserKey = !primaryKey.isEmpty
+        // When the user's own key has hit its daily limit, omit it so the backend falls back to the shared Vestigo key
+        let userKeyAtLimit = hasUserKey && settings.omdbDailyRequestCount >= settings.omdbTierLimit
+        let effectiveKey = userKeyAtLimit ? "" : primaryKey
 
         externalRatingInFlight.insert(item.key)
         defer { externalRatingInFlight.remove(item.key) }
 
         do {
-            if let ratings = try await backend.ratings(for: item, primaryKey: primaryKey, backupKey: backupKey), ratings.hasAnyRating {
+            if let ratings = try await backend.ratings(for: item, userKey: effectiveKey), ratings.hasAnyRating {
                 externalRatingsCache[item.key] = ratings
             } else {
                 externalRatingsCache[item.key] = .empty
             }
-            incrementOMDbDailyCount()
+            if hasUserKey && !userKeyAtLimit {
+                incrementOMDbDailyCount()
+            } else {
+                AnalyticsService.shared.track(.externalRatingFetched(keySource: "backend"))
+            }
             saveLocalSoon()
         } catch {
             print("IMDb ratings failed for \(item.title): \(error.localizedDescription)")
@@ -406,7 +421,7 @@ extension VestigoModel {
         }
         settings.omdbDailyRequestCount += 1
         settings.omdbTotalRequestCount += 1
-        AnalyticsService.shared.track(.externalRatingFetched)
+        AnalyticsService.shared.track(.externalRatingFetched(keySource: "user"))
         if settings.omdbDailyRequestCount >= settings.omdbTierLimit {
             showOMDbLimitAlert = true
         }

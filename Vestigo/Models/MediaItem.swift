@@ -176,5 +176,9 @@ extension MediaItem {
         let daysSinceRelease = Calendar.current.dateComponents([.day], from: date, to: .now).day ?? .max
         return daysSinceRelease <= 7
     }
+
+    var shareURL: URL {
+        URL(string: "vestigo://media?id=\(id)&kind=\(kind.rawValue)")!
+    }
 }
 

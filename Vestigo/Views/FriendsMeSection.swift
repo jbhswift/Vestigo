@@ -133,6 +133,17 @@ struct MeSectionView: View {
                 model: model
             )
 
+            let currentlyWatching = model.library.currentlyWatchingItems
+            if !currentlyWatching.isEmpty {
+                SocialPosterRow(
+                    title: "Currently Watching",
+                    items: currentlyWatching,
+                    emptyMessage: "",
+                    showRating: false,
+                    model: model
+                )
+            }
+
             VStack(spacing: 0) {
                 SharingRow(
                     label: "Don't share anything",

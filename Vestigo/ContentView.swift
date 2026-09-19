@@ -38,7 +38,6 @@ struct ContentView: View {
         switch type {
         case "openWatchlist": model.selectTab(.watchlist)
         case "openSearch": model.selectTab(.search)
-        case "openForYou": model.selectTab(.home)
         case "openPickForMe":
             model.selectTab(.home)
             model.homePath = [.pickForMe]
@@ -113,14 +112,29 @@ struct ContentView: View {
         }
         .favouriteReplacementOverlay(model: model)
         .ratingPromptOverlay(model: model)
-        .alert("Daily OMDb Limit Reached", isPresented: $model.showOMDbLimitAlert) {
+        .alert("Personal OMDb Key Limit Reached", isPresented: $model.showOMDbLimitAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Your OMDb API key has made \(model.settings.omdbDailyRequestCount.formatted()) requests today, reaching its daily limit. IMDb and Rotten Tomato ratings will not load until midnight. You can view or change your key tier from the OMDb website.")
+            Text("Your personal OMDb key has made \(model.settings.omdbDailyRequestCount.formatted()) requests today and reached its daily limit. Vestigo's shared key will be used for the rest of the day — IMDb ratings will continue to load normally.")
         }
         .onOpenURL { url in
             model.logLink("onOpenURL fired: \(url.absoluteString)")
             let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+
+            if url.scheme == "vestigo" && url.host == "media" {
+                guard let idStr = components?.queryItems?.first(where: { $0.name == "id" })?.value,
+                      let mediaID = Int(idStr)
+                else {
+                    model.logLink("onOpenURL: media link missing/invalid id")
+                    return
+                }
+                let kindStr = components?.queryItems?.first(where: { $0.name == "kind" })?.value ?? "movie"
+                let kind = MediaKind(rawValue: kindStr) ?? .movie
+                model.logLink("onOpenURL: media link id=\(mediaID) kind=\(kind.rawValue)")
+                Task { await model.handleMediaLink(id: mediaID, kind: kind) }
+                return
+            }
+
             let isCustomScheme = url.scheme == "vestigo" && url.host == "friend"
             let isUniversalLink = url.scheme == "https" && url.host == "jbhswift.github.io" && url.path == "/friend"
             guard (isCustomScheme || isUniversalLink),
@@ -153,6 +167,10 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await model.checkIncomingFriendRequests() }
+                // Republish profile on foreground so lastActiveAt stays fresh, throttled to 30 min
+                if Date().timeIntervalSince(model.lastProfilePublish) > 1800 {
+                    Task { await model.publishPublicProfile() }
+                }
             }
         }
         .alert(
@@ -255,7 +273,7 @@ private struct AppTabRoot: View {
                                 case .section(let sectionRoute):
                                     FullSectionView(route: sectionRoute, model: model)
                                         .background(AppBackground(settings: model.settings).ignoresSafeArea())
-                                case .forYouSection(let section):
+                                case .sectionDetail(let section):
                                     FullMediaListView(title: section.title, items: section.items, model: model)
                                         .background(AppBackground(settings: model.settings).ignoresSafeArea())
                                 case .pickForMe:

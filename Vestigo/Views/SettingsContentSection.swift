@@ -3,11 +3,6 @@ import Foundation
 
 struct SettingsContentSection: View {
     @ObservedObject var model: VestigoModel
-    @State private var omdbKeysExpanded = true
-    @State private var showPrimaryKey = false
-    @State private var showBackupKey = false
-    @FocusState private var primaryKeyFocused: Bool
-    @State private var primaryKeyWasEmptyOnFocus = false
 
     var body: some View {
         Text("Content")
@@ -21,7 +16,6 @@ struct SettingsContentSection: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Ratings source")
                     .font(.headline.bold())
-                let imdbAvailable = !model.settings.omdbPrimaryKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 Picker("Ratings source", selection: $model.settings.preferredRatingSource) {
                     Text("TMDb").tag(RatingSource.tmdb)
                     Text("IMDb").tag(RatingSource.imdb)
@@ -29,124 +23,11 @@ struct SettingsContentSection: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .liquidGlass(cornerRadius: 18)
-                .onChange(of: model.settings.preferredRatingSource) { _, new in
-                    if new == .imdb && !imdbAvailable {
-                        model.settings.preferredRatingSource = .tmdb
-                    }
-                }
-                Text(imdbAvailable
-                    ? "IMDb scores from OMDb are used for rating displays, filters, and sorts where available."
-                    : "Add an OMDb API key below to enable IMDb ratings.")
+                Text("IMDb scores from OMDb are used for rating displays, filters, and sorts where available.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .settingBubble()
-
-            let primaryTrimmed = model.settings.omdbPrimaryKey.trimmingCharacters(in: .whitespacesAndNewlines)
-            DisclosureGroup(isExpanded: $omdbKeysExpanded) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Spacer()
-                        Link("Get a free key →", destination: URL(string: "https://www.omdbapi.com/apikey.aspx")!)
-                            .font(.caption.bold())
-                            .foregroundStyle(model.settings.accentColor)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Primary key")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        HStack(spacing: 0) {
-                            Group {
-                                if showPrimaryKey {
-                                    TextField("Paste your OMDb API key", text: $model.settings.omdbPrimaryKey)
-                                } else {
-                                    SecureField("Paste your OMDb API key", text: $model.settings.omdbPrimaryKey)
-                                }
-                            }
-                            .focused($primaryKeyFocused)
-                            .font(.system(.body, design: .monospaced))
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                            Button { showPrimaryKey.toggle() } label: {
-                                Image(systemName: showPrimaryKey ? "eye.slash" : "eye")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.leading, 8)
-                            }
-                        }
-                        .padding(10)
-                        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Backup key (optional)")
-                            .font(.caption)
-                            .foregroundStyle(primaryTrimmed.isEmpty ? .tertiary : .secondary)
-                        HStack(spacing: 0) {
-                            Group {
-                                if showBackupKey {
-                                    TextField(primaryTrimmed.isEmpty ? "Add a primary key first" : "Paste a backup key", text: $model.settings.omdbBackupKey)
-                                } else {
-                                    SecureField(primaryTrimmed.isEmpty ? "Add a primary key first" : "Paste a backup key", text: $model.settings.omdbBackupKey)
-                                }
-                            }
-                            .font(.system(.body, design: .monospaced))
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                            .disabled(primaryTrimmed.isEmpty)
-                            Button { showBackupKey.toggle() } label: {
-                                Image(systemName: showBackupKey ? "eye.slash" : "eye")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.leading, 8)
-                            }
-                            .disabled(primaryTrimmed.isEmpty)
-                        }
-                        .padding(10)
-                        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .opacity(primaryTrimmed.isEmpty ? 0.4 : 1)
-                    }
-                    .onChange(of: primaryTrimmed) { old, new in
-                        if new.isEmpty {
-                            model.settings.omdbBackupKey = ""
-                            model.settings.preferredRatingSource = .tmdb
-                        } else if old.isEmpty {
-                            model.settings.preferredRatingSource = .imdb
-                        }
-                    }
-                    .onChange(of: primaryKeyFocused) { _, focused in
-                        if focused {
-                            primaryKeyWasEmptyOnFocus = model.settings.omdbPrimaryKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        } else if primaryKeyWasEmptyOnFocus && !model.settings.omdbPrimaryKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            model.refreshVisibleExternalRatings()
-                        }
-                    }
-
-                    Text("Your key is stored privately on-device and synced to your Apple ID via iCloud — it is never shared. Without a key, IMDb ratings are unavailable and scores fall back to TMDb.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    if !primaryTrimmed.isEmpty {
-                        OMDbUsageBar(settings: model.settings)
-                    }
-                }
-                .padding(.top, 8)
-            } label: {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("OMDb API Keys")
-                        .font(.headline.bold())
-                        .foregroundStyle(.primary)
-                    Text(primaryTrimmed.isEmpty ? "No key — ratings fall back to TMDb" : (!model.settings.omdbBackupKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Keys configured" : "Key configured"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .foregroundStyle(.primary)
-            .tint(model.settings.accentColor)
-            .settingBubble()
-            .onAppear { omdbKeysExpanded = primaryTrimmed.isEmpty }
 
             VStack(alignment: .leading, spacing: 6) {
                 Toggle("Prioritise English", isOn: $model.settings.prioritiseEnglish)
@@ -262,12 +143,6 @@ struct SettingsContentSection: View {
             DisclosureGroup {
                 VStack(alignment: .leading, spacing: 10) {
                     Toggle("Search", isOn: $model.settings.hideUpcomingFromSearch)
-                        .font(.subheadline.bold())
-                        .foregroundStyle(.primary)
-                        .tint(model.settings.accentColor)
-                        .padding(.trailing, 6)
-
-                    Toggle("For You", isOn: $model.settings.hideUpcomingFromRecommended)
                         .font(.subheadline.bold())
                         .foregroundStyle(.primary)
                         .tint(model.settings.accentColor)

@@ -43,7 +43,7 @@ struct FranchiseCollection: Identifiable, Hashable {
     }
 }
 
-struct ForYouSection: Identifiable, Hashable {
+struct HomeSectionDetail: Identifiable, Hashable {
     let id = UUID()
     let title: String
     let items: [MediaItem]

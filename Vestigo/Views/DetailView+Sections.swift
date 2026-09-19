@@ -301,26 +301,43 @@ extension DetailView {
                 : (featured ? "Featured on profile" : "Feature on profile")
             let tint: Color = item.isUpcoming ? .orange : model.settings.accentColor
 
-            Button {
-                model.toggleFeatured(item)
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: icon)
-                        .font(.headline.bold())
-                        .foregroundStyle(featured ? tint : .primary)
+            HStack(spacing: 10) {
+                Button {
+                    model.toggleFeatured(item)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: icon)
+                            .font(.headline.bold())
+                            .foregroundStyle(featured ? tint : .primary)
 
-                    Text(label)
-                        .font(.headline.bold())
+                        Text(label)
+                            .font(.headline.bold())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
 
-                    Spacer(minLength: 0)
+                        Spacer(minLength: 0)
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 14)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .liquidGlass(cornerRadius: 22)
+                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 14)
-                .frame(height: 46)
-                .liquidGlass(cornerRadius: 22)
-                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .buttonStyle(.plain)
+
+                ShareLink(item: item.shareURL, subject: Text(item.title), message: Text("Check out \(item.title) on Vestigo")) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                        .font(.headline.bold())
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .liquidGlass(cornerRadius: 22)
+                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
 

@@ -55,6 +55,10 @@ private struct DevToolsPanel: View {
     @State private var isRestartingConnection = false
     @State private var restartResult: String = ""
 
+    @State private var showPrimaryKey = false
+    @FocusState private var primaryKeyFocused: Bool
+    @State private var primaryKeyWasEmptyOnFocus = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
 
@@ -131,14 +135,66 @@ private struct DevToolsPanel: View {
             .tint(model.settings.accentColor)
             .settingBubble()
 
+            // MARK: OMDb Override Key
+            devSectionLabel("OMDb Override Key")
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Vestigo uses a shared OMDb key for all users. If you set a personal override, it is sent to the backend first. When it reaches its daily limit the shared key takes over automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                let primaryTrimmed = model.settings.omdbPrimaryKey.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Primary key")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 0) {
+                        Group {
+                            if showPrimaryKey {
+                                TextField("Override primary key", text: $model.settings.omdbPrimaryKey)
+                            } else {
+                                SecureField("Override primary key", text: $model.settings.omdbPrimaryKey)
+                            }
+                        }
+                        .focused($primaryKeyFocused)
+                        .font(.system(.body, design: .monospaced))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        Button { showPrimaryKey.toggle() } label: {
+                            Image(systemName: showPrimaryKey ? "eye.slash" : "eye")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .padding(.leading, 8)
+                        }
+                    }
+                    .padding(10)
+                    .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+
+                .onChange(of: primaryKeyFocused) { _, focused in
+                    if focused {
+                        primaryKeyWasEmptyOnFocus = model.settings.omdbPrimaryKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    } else if primaryKeyWasEmptyOnFocus && !model.settings.omdbPrimaryKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        model.refreshVisibleExternalRatings()
+                    }
+                }
+
+                if !primaryTrimmed.isEmpty {
+                    Divider().opacity(0.3)
+                    Text("Personal key usage")
+                        .font(.caption.bold())
+                        .foregroundStyle(.secondary)
+                    OMDbUsageBar(settings: model.settings)
+                    Button("Reset counters") { model.resetOMDbCounters() }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .settingBubble()
+
             // MARK: Actions
             devSectionLabel("Actions")
-
-            Button("Reset OMDb counters") {
-                model.resetOMDbCounters()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .settingBubble()
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {

@@ -43,28 +43,11 @@ struct FriendsListView: View {
                                 Text(friend.name)
                                     .font(.subheadline.bold())
                                     .foregroundStyle(.primary)
-                                if let lastItem = friend.mostRecentlyWatchedItem {
-                                    let watchDate = friend.watchedDates[lastItem.key.stableID]
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 9, weight: .semibold))
-                                            .foregroundStyle(.tertiary)
-                                        if let date = watchDate {
-                                            Text("\(lastItem.title) · \(date.formatted(.relative(presentation: .named)))")
-                                                .font(.caption2)
-                                                .foregroundStyle(.tertiary)
-                                                .lineLimit(1)
-                                        } else {
-                                            Text(lastItem.title)
-                                                .font(.caption2)
-                                                .foregroundStyle(.tertiary)
-                                                .lineLimit(1)
-                                        }
-                                    }
-                                } else if let activity = friend.recentActivity {
+                                if let activity = friend.recentActivity {
                                     Text("Active \(activity.formatted(.relative(presentation: .named)))")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
+                                        .lineLimit(1)
                                 }
                             }
                             Spacer()

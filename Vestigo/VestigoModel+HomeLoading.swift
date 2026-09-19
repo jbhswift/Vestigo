@@ -57,8 +57,6 @@ extension VestigoModel {
     }
 
     func refreshVisibleExternalRatings() {
-        guard settings.preferredRatingSource == .imdb else { return }
-        guard !settings.omdbPrimaryKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         // Strip empty sentinel entries so the fetch guard doesn't skip them
         externalRatingsCache = externalRatingsCache.filter { $0.value.hasAnyRating }
         let visible = (trending + popular + newReleases + upcoming + recommendations

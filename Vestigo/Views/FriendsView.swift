@@ -21,6 +21,7 @@ struct FriendProfile: Identifiable, Hashable, Codable {
     var ratings: [MediaKey: Double] = [:]
     var favouriteKeys: Set<String> = []
     var watchedDates: [String: Date] = [:]
+    var currentlyWatchingItems: [MediaItem] = []
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: FriendProfile, rhs: FriendProfile) -> Bool { lhs.id == rhs.id }

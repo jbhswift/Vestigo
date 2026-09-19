@@ -220,7 +220,7 @@ async function tasteDiveSimilar(query: string, type: string, limit: string) {
 
 async function fetchOMDb(params: Record<string, string>, userKeys: string[]) {
   const keys = userKeys
-    .map((k, i) => ({ key: k.trim(), label: i === 0 ? "user-primary" : "user-backup" }))
+    .map((k, i) => ({ key: k.trim(), label: i === 0 ? "user" : "vestigo-backend" }))
     .filter(a => a.key.length > 0)
 
   if (keys.length === 0) {
@@ -1368,9 +1368,9 @@ Deno.serve(async (req) => {
       const rawKind = String(url.searchParams.get("kind") ?? "movie").toLowerCase()
       const title = url.searchParams.get("title")
       const year = releaseYear(url.searchParams.get("year"))
-      const userPrimaryKey = (url.searchParams.get("userKey") ?? "").trim()
-      const userBackupKey = (url.searchParams.get("userBackupKey") ?? "").trim()
-      const userKeys = [userPrimaryKey, userBackupKey].filter(k => k.length > 0)
+      const userKey = (url.searchParams.get("userKey") ?? "").trim()
+      const backendKey = (Deno.env.get("OMDB_KEY") ?? "").trim()
+      const keys = [userKey, backendKey].filter(k => k.length > 0)
 
       if (!Number.isFinite(tmdbID) || tmdbID <= 0) {
         return Response.json(
@@ -1386,11 +1386,7 @@ Deno.serve(async (req) => {
         )
       }
 
-      if (userKeys.length === 0) {
-        return Response.json({ ok: true, source: "omdb", tmdbID, kind: rawKind, ratings: null })
-      }
-
-      const ratings = await omdbRatingsForTMDbID(tmdbID, rawKind, title, year, userKeys)
+      const ratings = await omdbRatingsForTMDbID(tmdbID, rawKind, title, year, keys)
 
       return Response.json({
         ok: true,
