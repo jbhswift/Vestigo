@@ -225,6 +225,31 @@ actor VestigoBackendClient {
         _ = try? await URLSession.shared.data(for: request)
     }
 
+    func chart(kind: MediaKind, ranking: RatingSource = .imdb) async throws -> [BackendChartItemDTO] {
+        var components = URLComponents(url: baseURL.appending(path: "charts"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "kind", value: kind.rawValue),
+            URLQueryItem(name: "ranking", value: ranking.rawValue)
+        ]
+        guard let url = components.url else { throw URLError(.badURL) }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        Task.detached { @MainActor in AnalyticsService.shared.track(.apiCallMade(service: "imdb")) }
+        guard let httpResponse = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? "unreadable"
+            throw NSError(domain: "VestigoCharts", code: httpResponse.statusCode,
+                          userInfo: [NSLocalizedDescriptionKey: "HTTP \(httpResponse.statusCode): \(body.prefix(200))"])
+        }
+        do {
+            let decoded = try JSONDecoder().decode(BackendChartResponse.self, from: data)
+            return decoded.items
+        } catch {
+            let body = String(data: data, encoding: .utf8) ?? "unreadable"
+            throw NSError(domain: "VestigoCharts", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Decode error: \(error) | JSON: \(body.prefix(200))"])
+        }
+    }
+
     static func normalizedTitle(_ value: String) -> String {
         value
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
@@ -232,6 +257,47 @@ actor VestigoBackendClient {
             .replacingOccurrences(of: "[^a-z0-9]+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+}
+
+struct BackendChartItemDTO: nonisolated Decodable {
+    let id: Int
+    let kind: String
+    let title: String
+    let overview: String
+    let posterPath: String?
+    let backdropPath: String?
+    let releaseDate: String?
+    let voteAverage: Double
+    let genreIDs: [Int]
+    let originalLanguage: String?
+    let imdbID: String?
+    let imdbRating: Double?
+    let imdbVotes: String?
+    let rottenTomatoesRating: Int?
+    let rottenTomatoesText: String?
+
+    nonisolated var mediaItem: MediaItem {
+        MediaItem(
+            id: id,
+            kind: kind == "tv" ? .tv : .movie,
+            title: title,
+            overview: overview,
+            posterPath: posterPath,
+            backdropPath: backdropPath,
+            releaseDate: releaseDate,
+            voteAverage: voteAverage,
+            genreIDs: genreIDs,
+            creditRole: nil,
+            runtime: nil,
+            originalLanguage: originalLanguage
+        )
+    }
+
+}
+
+struct BackendChartResponse: nonisolated Decodable {
+    let ok: Bool
+    let items: [BackendChartItemDTO]
 }
 
 struct BackendFranchiseMembershipResponse: nonisolated Decodable {

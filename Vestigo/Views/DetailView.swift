@@ -132,8 +132,8 @@ struct DetailView: View {
                 episodeSection
                 similarSection
                 trailerSection
-                providersSection
                 cinemasSection
+                providersSection
                 relatedMediaSection
                 soundtrackSection
             }

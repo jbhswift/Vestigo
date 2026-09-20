@@ -242,32 +242,104 @@ extension VestigoModel {
     }
 
     func loadTopRated(kind: MediaKind) async {
+        try? await loadTopRatedThrowing(kind: kind)
+    }
+
+    var chartCacheCount: Int {
+        ["movie", "tv"].flatMap { kind in
+            ["imdb", "tmdb"].map { ranking in "Vestigo.chartCache.v3.\(kind).\(ranking)" }
+        }
+        .filter { UserDefaults.standard.data(forKey: $0) != nil }
+        .count
+    }
+
+    func clearChartCache() {
+        for kind in ["movie", "tv"] {
+            for ranking in ["imdb", "tmdb"] {
+                UserDefaults.standard.removeObject(forKey: "Vestigo.chartCache.v3.\(kind).\(ranking)")
+            }
+        }
+        topRatedMovies = []
+        topRatedShows = []
+    }
+
+    func loadTopRatedThrowing(kind: MediaKind) async throws {
         guard kind == .movie || kind == .tv else { return }
-        do {
-            let items = try await tmdb.topRated(kind: kind)
-            let prepared = preparedResults(items)
-            let pool = settings.prioritiseEnglish
-                ? prepared.filter { ($0.originalLanguage ?? "en") == "en" }
-                : prepared
+        let ranking = settings.preferredRatingSource
 
-            if settings.preferredRatingSource != .imdb {
-                let sorted = pool.sorted { $0.voteAverage > $1.voteAverage }
-                if kind == .movie { topRatedMovies = sorted } else { topRatedShows = sorted }
-                return
-            }
+        // Pre-populate from local cache immediately — eliminates spinner on repeat visits
+        restoreChartFromLocalCache(kind: kind, ranking: ranking)
 
-            for item in pool {
-                await loadExternalRatings(item)
+        // Skip network fetch if the local cache is still within its 7-day window
+        if isChartLocalCacheFresh(kind: kind, ranking: ranking) { return }
+
+        let chartItems = try await backend.chart(kind: kind, ranking: ranking)
+        let items = chartItems.map(\.mediaItem)
+        for dto in chartItems {
+            let ratings = ExternalRatings(
+                imdbID: dto.imdbID,
+                imdbRating: dto.imdbRating,
+                imdbVotes: dto.imdbVotes,
+                rottenTomatoesRating: dto.rottenTomatoesRating,
+                rottenTomatoesText: dto.rottenTomatoesText
+            )
+            if ratings.hasAnyRating {
+                externalRatingsCache[dto.mediaItem.key] = ratings
             }
-            let imdbSorted = pool.sorted { lhs, rhs in
-                let lIMDb = externalRatingsCache[lhs.key]?.imdbRating
-                let rIMDb = externalRatingsCache[rhs.key]?.imdbRating
-                if let l = lIMDb, let r = rIMDb { return l > r }
-                if lIMDb != nil { return true }
-                if rIMDb != nil { return false }
-                return lhs.voteAverage > rhs.voteAverage
+        }
+        if kind == .movie { topRatedMovies = items } else { topRatedShows = items }
+        saveChartToLocalCache(kind: kind, ranking: ranking, chartItems: chartItems)
+    }
+
+    // MARK: - Local chart cache (UserDefaults, 7-day TTL)
+
+    private struct ChartCacheEntry: Codable {
+        let item: MediaItem
+        let ratings: ExternalRatings?
+    }
+
+    private struct ChartCacheRecord: Codable {
+        let entries: [ChartCacheEntry]
+        let savedAt: Date
+    }
+
+    private func chartLocalCacheKey(kind: MediaKind, ranking: RatingSource) -> String {
+        "Vestigo.chartCache.v3.\(kind.rawValue).\(ranking.rawValue)"
+    }
+
+    private func restoreChartFromLocalCache(kind: MediaKind, ranking: RatingSource) {
+        let key = chartLocalCacheKey(kind: kind, ranking: ranking)
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let record = try? JSONDecoder().decode(ChartCacheRecord.self, from: data),
+              !record.entries.isEmpty else { return }
+        let items = record.entries.map(\.item)
+        for entry in record.entries {
+            if let ratings = entry.ratings {
+                externalRatingsCache[entry.item.key] = ratings
             }
-            if kind == .movie { topRatedMovies = imdbSorted } else { topRatedShows = imdbSorted }
-        } catch { }
+        }
+        if kind == .movie { topRatedMovies = items } else { topRatedShows = items }
+    }
+
+    private func isChartLocalCacheFresh(kind: MediaKind, ranking: RatingSource) -> Bool {
+        let key = chartLocalCacheKey(kind: kind, ranking: ranking)
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let record = try? JSONDecoder().decode(ChartCacheRecord.self, from: data) else { return false }
+        return Date().timeIntervalSince(record.savedAt) < 7 * 24 * 60 * 60
+    }
+
+    private func saveChartToLocalCache(kind: MediaKind, ranking: RatingSource, chartItems: [BackendChartItemDTO]) {
+        let entries = chartItems.map { dto in
+            let ratings = ExternalRatings(
+                imdbID: dto.imdbID,
+                imdbRating: dto.imdbRating,
+                imdbVotes: dto.imdbVotes,
+                rottenTomatoesRating: dto.rottenTomatoesRating,
+                rottenTomatoesText: dto.rottenTomatoesText
+            )
+            return ChartCacheEntry(item: dto.mediaItem, ratings: ratings.hasAnyRating ? ratings : nil)
+        }
+        guard let data = try? JSONEncoder().encode(ChartCacheRecord(entries: entries, savedAt: Date())) else { return }
+        UserDefaults.standard.set(data, forKey: chartLocalCacheKey(kind: kind, ranking: ranking))
     }
 }

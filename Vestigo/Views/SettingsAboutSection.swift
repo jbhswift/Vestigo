@@ -113,6 +113,7 @@ private struct DevToolsPanel: View {
                 cacheRow("Person details",    count: model.personDetails.count)          { model.personDetails = [:] }
                 cacheRow("Collection recs",   count: model.collectionRecommendations.count) { model.collectionRecommendations = [:] }
                 cacheRow("Home feed",         count: MediaFilter.allCases.filter { UserDefaults.standard.data(forKey: "Vestigo.homeFeedCaches.\($0.rawValue)") != nil }.count) { model.clearHomeFeedCache() }
+                cacheRow("Rankings",          count: model.chartCacheCount)              { model.clearChartCache() }
                 cacheRow("Poster images",     count: ImageCache.shared.count)            { ImageCache.shared.clear() }
                 Divider().opacity(0.3)
                 Button("Clear all caches") {

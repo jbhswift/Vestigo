@@ -16,15 +16,18 @@ function trackApiCall(service: string): void {
 
 function normalizeAMCFormat(raw: string | null): string | null {
   if (!raw) return null
-  const s = raw.toLowerCase()
+  // Strip all non-alphanumeric chars so "Laser at AMC", "LaserAtAMC", "LASERATAMC" all match
+  const s = raw.toLowerCase().replace(/[^a-z0-9]/g, "")
   if (s.includes("imax")) return "IMAX"
   if (s.includes("dolby")) return "Dolby Cinema"
-  if (s.includes("plf") || s.includes("premium large")) return "PLF"
+  if (s.includes("plf") || s.includes("premiumlarge") || s.includes("premiumformat")) return "PLF"
   if (s.includes("laser")) return "Laser at AMC"
   if (s.includes("3d")) return "3D"
   if (s.includes("dine") || s.includes("fork")) return "Dine-In"
-  if (s === "standard" || s === "digital") return null
-  return raw
+  if (s.includes("bigd")) return "BigD"
+  if (s.includes("prime")) return "Prime at AMC"
+  // Standard/digital/unknown codes are not worth showing to users
+  return null
 }
 
 function normalizeTitle(value: string) {
@@ -1212,6 +1215,109 @@ async function getServiceUsage(days = 30): Promise<Record<string, number>> {
   return counts
 }
 
+// --- Charts: persistent Supabase DB cache + OMDb enrichment ---
+
+async function batchedParallel<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = []
+  for (let i = 0; i < items.length; i += batchSize) {
+    results.push(...(await Promise.all(items.slice(i, i + batchSize).map(fn))))
+  }
+  return results
+}
+
+async function getChartCache(cacheKey: string): Promise<{ items: any[], updatedAt: string } | null> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  if (!supabaseUrl || !supabaseKey) return null
+  try {
+    const resp = await fetchWithTimeout(
+      `${supabaseUrl}/rest/v1/charts_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=items,updated_at`,
+      { headers: { "apikey": supabaseKey, "Authorization": `Bearer ${supabaseKey}` } }
+    )
+    if (!resp.ok) return null
+    const rows = await resp.json()
+    if (!Array.isArray(rows) || rows.length === 0) return null
+    return { items: rows[0].items, updatedAt: rows[0].updated_at }
+  } catch {
+    return null
+  }
+}
+
+async function setChartCache(cacheKey: string, items: any[]): Promise<void> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  if (!supabaseUrl || !supabaseKey) return
+  try {
+    await fetchWithTimeout(
+      `${supabaseUrl}/rest/v1/charts_cache`,
+      {
+        method: "POST",
+        headers: {
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates"
+        },
+        body: JSON.stringify({ cache_key: cacheKey, items, updated_at: new Date().toISOString() })
+      }
+    )
+  } catch { /* non-fatal */ }
+}
+
+function isCacheFresh(updatedAt: string): boolean {
+  const updated = new Date(updatedAt)
+  const now = new Date()
+  if (now.getTime() - updated.getTime() > 7 * 24 * 60 * 60 * 1000) return false
+  // Also stale if a Sunday midnight UTC has passed since the last update
+  const lastSunday = new Date(now)
+  lastSunday.setUTCDate(now.getUTCDate() - now.getUTCDay())
+  lastSunday.setUTCHours(0, 0, 0, 0)
+  return updated >= lastSunday
+}
+
+async function enrichPoolWithRatings(kind: "movie" | "tv", dtos: any[]): Promise<any[]> {
+  const omdbKey = (Deno.env.get("OMDB_KEY") ?? "").trim()
+
+  // Fetch TMDb external_ids in batches of 40 to get IMDb IDs
+  const extResults = await batchedParallel(dtos, 40, async (dto) => {
+    try {
+      const ext = await fetchTMDb(`/${kind}/${dto.id}/external_ids`)
+      const rawID = String(ext?.imdb_id ?? "").trim()
+      return { id: dto.id as number, imdbID: rawID || null }
+    } catch {
+      return { id: dto.id as number, imdbID: null }
+    }
+  })
+
+  const imdbIDMap = new Map<number, string | null>(extResults.map(e => [e.id, e.imdbID]))
+  const ratingsMap = new Map<number, ReturnType<typeof normalizeOMDbRatings>>()
+
+  if (omdbKey) {
+    const withIMDbID = dtos.filter(dto => imdbIDMap.get(dto.id))
+    await batchedParallel(withIMDbID, 20, async (dto) => {
+      const imdbID = imdbIDMap.get(dto.id)!
+      try {
+        const data = await fetchOMDb({ i: imdbID, plot: "short" }, [omdbKey])
+        const normalized = normalizeOMDbRatings(data)
+        if (normalized) ratingsMap.set(dto.id, normalized)
+      } catch {}
+    })
+  }
+
+  return dtos.map(dto => ({
+    ...dto,
+    imdbID: imdbIDMap.get(dto.id) ?? null,
+    imdbRating: ratingsMap.get(dto.id)?.imdbRating ?? null,
+    imdbVotes: ratingsMap.get(dto.id)?.imdbVotes ?? null,
+    rottenTomatoesRating: ratingsMap.get(dto.id)?.rottenTomatoesRating ?? null,
+    rottenTomatoesText: ratingsMap.get(dto.id)?.rottenTomatoesText ?? null,
+  }))
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url)
 
@@ -1600,6 +1706,27 @@ Deno.serve(async (req) => {
         return Response.json({ ok: probeResp.ok, status: probeResp.status, body: probeBody })
       }
 
+      // Regional KV cache keyed by (normalized title, date, lat rounded to 1dp, lon rounded to 1dp).
+      // 1 decimal place ≈ 11km cell — everyone in the same metro searching the same film on the same
+      // day shares one AMC API call instead of each hitting AMC individually.
+      const bypassCache = url.searchParams.get("force_refresh") === "1" || url.searchParams.get("debug") === "1"
+      const roundedLat = String(Math.round(Number(lat) / 5) * 5)
+      const roundedLon = String(Math.round(Number(lon) / 5) * 5)
+      // v4: cache entries now include real theatre coordinates; bump version to discard stale v3 entries
+      const kvCacheKey = ["amc_v4", normalizeTitle(filmTitle), date, roundedLat, roundedLon]
+
+      if (!bypassCache) {
+        try {
+          const kv = await Deno.openKv()
+          const cached = await kv.get<{ theaters: any[], totalShowtimes: number, matchedShowtimes: number, cachedAt: number }>(kvCacheKey)
+          if (cached.value !== null) {
+            return Response.json({ ok: true, ...cached.value, cached: true })
+          }
+        } catch {
+          // KV unavailable — fall through to live AMC call
+        }
+      }
+
       const amcResp = await fetchWithTimeout(amcURL, {
         headers: {
           "X-AMC-Vendor-Key": amcKey,
@@ -1623,54 +1750,100 @@ Deno.serve(async (req) => {
 
       const allShowtimes: any[] = amcData?._embedded?.showtimes ?? []
 
-      // Filter to only showtimes for the requested film
-      const matching = allShowtimes.filter(st => {
-        const name = st._embedded?.movie?.name ?? st.movieName ?? ""
+      // Pass ?theatre_shape=1 to inspect the raw showtime shape (diagnostic)
+      if (url.searchParams.get("theatre_shape") === "1") {
+        const first = allShowtimes[0] ?? null
+        return Response.json({
+          ok: true,
+          total: allShowtimes.length,
+          firstShowtimeKeys: first ? Object.keys(first) : null,
+          firstShowtime: first
+        })
+      }
+
+      // Filter to only showtimes for the requested film.
+      // AMC v2 flat response uses st.movieName directly (no _embedded on individual showtimes).
+      const matching = allShowtimes.filter((st: any) => {
+        const name = st.movieName ?? st._embedded?.movie?.name ?? ""
         return matchScore(name, filmTitle) >= 60
       })
 
-      // Group by theatre
-      const theatreMap = new Map<string, { name: string; lat: number | null; lon: number | null; entries: any[] }>()
+      // Get unique theatre IDs from matched showtimes, then fetch their details
+      // (name + coordinates) in parallel — coordinates are NOT in the showtimes response.
+      const uniqueTheatreIds: number[] = [...new Set(matching.map((st: any) => st.theatreId).filter(Boolean))]
+      const amcHeaders = { "X-AMC-Vendor-Key": amcKey, "Accept": "application/json" }
+
+      const theatreDetailResults = await Promise.all(
+        uniqueTheatreIds.slice(0, 20).map(id =>
+          fetchWithTimeout(`https://api.amctheatres.com/v2/theatres/${id}`, { headers: amcHeaders }, 6000)
+            .then(r => r.ok ? r.json().catch(() => null) : null)
+            .catch(() => null)
+        )
+      )
+
+      // Parse coordinates tolerantly (number or string)
+      const parseCoord = (v: any): number | null => {
+        if (typeof v === "number" && !isNaN(v)) return v
+        if (typeof v === "string" && v !== "") { const n = Number(v); return isNaN(n) ? null : n }
+        return null
+      }
+
+      const theatreInfo = new Map<number, { name: string; lat: number | null; lon: number | null }>()
+      for (const th of theatreDetailResults) {
+        if (!th?.id) continue
+        const loc = th.location ?? th._embedded?.location ?? {}
+        theatreInfo.set(Number(th.id), {
+          name: th.name ?? "AMC Theatre",
+          lat: parseCoord(loc.lat) ?? parseCoord(loc.latitude) ?? null,
+          lon: parseCoord(loc.lng) ?? parseCoord(loc.lon) ?? parseCoord(loc.longitude) ?? null
+        })
+      }
+
+      // Group showtimes by theatreId
+      const theatreMap = new Map<number, { name: string; lat: number | null; lon: number | null; entries: any[] }>()
 
       for (const st of matching) {
-        const theatreName: string = st._embedded?.theatre?.name ?? "AMC Theatre"
-        if (!theatreMap.has(theatreName)) {
-          const loc = st._embedded?.theatre?.location
-          theatreMap.set(theatreName, {
-            name: theatreName,
-            lat: typeof loc?.latitude === "number" ? loc.latitude : null,
-            lon: typeof loc?.longitude === "number" ? loc.longitude : null,
+        const theatreId: number = Number(st.theatreId)
+        if (!theatreMap.has(theatreId)) {
+          const info = theatreInfo.get(theatreId)
+          theatreMap.set(theatreId, {
+            name: info?.name ?? "AMC Theatre",
+            lat: info?.lat ?? null,
+            lon: info?.lon ?? null,
             entries: []
           })
         }
 
-        // AMC returns local time without timezone; convert to a UTC-anchored ISO string
-        // by treating the local time as-is (display only, not timezone-sensitive)
         const rawTime: string = st.showDateTimeLocal ?? st.showDateTime ?? ""
 
-        // Format: AMC uses _embedded.movieVisitType.name or top-level movieVisitType
-        const formatRaw: string | null =
-          st._embedded?.movieVisitType?.name ??
-          (typeof st.movieVisitType === "string" ? st.movieVisitType : null) ??
-          null
+        // Format: premiumFormat field, then attributes that match known format codes
+        const premiumFormat = normalizeAMCFormat(
+          typeof st.premiumFormat === "string" && st.premiumFormat ? st.premiumFormat : null
+        )
+        const attrFormat = premiumFormat == null
+          ? (() => {
+              const fmtAttr = (st.attributes ?? []).find((a: any) => normalizeAMCFormat(a.code ?? null) !== null)
+              return fmtAttr ? normalizeAMCFormat(fmtAttr.code) : null
+            })()
+          : null
+        const format = premiumFormat ?? attrFormat
 
-        // Normalise common format names to short labels
-        const format = normalizeAMCFormat(formatRaw)
+        // Accessibility: known codes from attributes
+        const knownAccessibility = ["CC", "OC", "AD", "AS", "HH", "HL", "CLOSEDCAPTION", "OPTICALLYCAPTIONED", "AUDIODESCRIPTION", "DESCRIPTIVEVIDEO", "ASSISTIVELISTENING", "HEARINGLOOP"]
+        const accessibility: string[] = (st.attributes ?? [])
+          .filter((a: any) => {
+            const code = (a.code ?? "").toUpperCase()
+            return knownAccessibility.some(k => code.includes(k))
+          })
+          .map((a: any) => a.name ?? a.code)
+          .filter(Boolean)
 
-        // Accessibility from attributes array (objects with `code` or `description`)
-        const attrCodes: string[] = (st.attributes ?? [])
-          .map((a: any) => (a.code ?? a.description ?? "").toString().toUpperCase())
-          .filter((c: string) => c.length > 0)
-
-        const knownAccessibility = ["CC", "OC", "AD", "AS", "HH", "HL"]
-        const accessibility = attrCodes.filter(c => knownAccessibility.some(k => c.includes(k)))
-
-        theatreMap.get(theatreName)!.entries.push({
+        theatreMap.get(theatreId)!.entries.push({
           id: String(st.id ?? ""),
           startTime: rawTime,
           format,
           accessibility: accessibility.length > 0 ? accessibility : null,
-          bookingURL: st.purchaseUrl ?? st._links?.["amc:purchase"]?.href ?? null
+          bookingURL: st.purchaseUrl ?? st.mobilePurchaseUrl ?? null
         })
       }
 
@@ -1681,7 +1854,24 @@ Deno.serve(async (req) => {
         showtimes: t.entries.sort((a, b) => a.startTime.localeCompare(b.startTime))
       }))
 
-      return Response.json({ ok: true, totalShowtimes: allShowtimes.length, matchedShowtimes: matching.length, theaters })
+      // Cache: 7 days for found results, 24h for empty (film may start showing soon).
+      // cachedAt timestamp lets the iOS client show data freshness.
+      const cachedAt = Date.now()
+      const ttlMs = theaters.length > 0
+        ? 7 * 24 * 60 * 60 * 1000
+        : 24 * 60 * 60 * 1000
+      try {
+        const kv = await Deno.openKv()
+        await kv.set(
+          kvCacheKey,
+          { theaters, totalShowtimes: allShowtimes.length, matchedShowtimes: matching.length, cachedAt },
+          { expireIn: ttlMs }
+        )
+      } catch {
+        // Non-fatal
+      }
+
+      return Response.json({ ok: true, totalShowtimes: allShowtimes.length, matchedShowtimes: matching.length, theaters, cachedAt, cached: false })
     }
 
     if (url.pathname.endsWith("/thematic-recommend")) {
@@ -2076,6 +2266,93 @@ Rules:
       const days = Math.min(Math.max(Number(url.searchParams.get("days") ?? "30"), 1), 90)
       const counts = await getServiceUsage(days)
       return Response.json({ ok: true, days, counts })
+    }
+
+    if (url.pathname.endsWith("/charts")) {
+      const rawKind = String(url.searchParams.get("kind") ?? "movie").toLowerCase()
+      if (rawKind !== "movie" && rawKind !== "tv") {
+        return Response.json({ ok: false, error: "kind must be movie or tv" }, { status: 400 })
+      }
+      const kind = rawKind as "movie" | "tv"
+      const ranking = url.searchParams.get("ranking") === "tmdb" ? "tmdb" : "imdb"
+      const forceRefresh = url.searchParams.get("force_refresh") === "1"
+
+      const tmdbCacheKey = `charts_tmdb_${kind}_v3`
+      const imdbCacheKey = `charts_imdb_${kind}_v3`
+
+      // Serve from cache if fresh
+      if (!forceRefresh) {
+        const requestedKey = ranking === "tmdb" ? tmdbCacheKey : imdbCacheKey
+        const cached = await getChartCache(requestedKey)
+        if (cached && isCacheFresh(cached.updatedAt)) {
+          return Response.json({ ok: true, items: cached.items, updatedAt: cached.updatedAt, source: "cache", ranking })
+        }
+      }
+
+      // Fetch 7 pages of results in parallel (~140 item pool).
+      // Movies use /discover/movie with without_genres=10770 so TMDb excludes TV Movies
+      // (e.g. Doctor Who specials) at the query level — more reliable than post-filter.
+      // TV uses /tv/top_rated which has no equivalent issue.
+      const allResults: any[] = []
+      await Promise.all(
+        [1,2,3,4,5,6,7].map(async (page) => {
+          try {
+            let data: any
+            if (kind === "movie") {
+              data = await fetchTMDb("/discover/movie", {
+                sort_by: "vote_average.desc",
+                "vote_count.gte": "3000",
+                without_genres: "10770",
+                include_adult: "false",
+                page: String(page)
+              })
+            } else {
+              data = await fetchTMDb("/tv/top_rated", { page: String(page) })
+            }
+            if (Array.isArray(data.results)) allResults.push(...data.results)
+          } catch {}
+        })
+      )
+
+      // Dedupe and build base DTOs
+      const seen = new Set<number>()
+      const pool = allResults
+        .filter(item => {
+          if (!Number.isFinite(item?.id) || seen.has(item.id)) return false
+          seen.add(item.id)
+          return true
+        })
+        .map(item => {
+          const dto = kind === "movie" ? tmdbMovieDTO(item) : tmdbTVDTO(item)
+          return { ...dto, overview: dto.overview.slice(0, 250) }
+        })
+
+      // Enrich all pool items with IMDb IDs + OMDb ratings
+      const enriched = await enrichPoolWithRatings(kind, pool)
+
+      // TMDb list: top 100 by vote_average
+      const tmdbList = [...enriched]
+        .sort((a, b) => (b.voteAverage ?? 0) - (a.voteAverage ?? 0))
+        .slice(0, 100)
+
+      // IMDb list: top 100 by IMDb rating, TMDb as tiebreaker for unrated items
+      const imdbList = [...enriched]
+        .sort((a, b) => {
+          const ar = typeof a.imdbRating === "number" ? a.imdbRating : -1
+          const br = typeof b.imdbRating === "number" ? b.imdbRating : -1
+          if (br !== ar) return br - ar
+          return (b.voteAverage ?? 0) - (a.voteAverage ?? 0)
+        })
+        .slice(0, 100)
+
+      const updatedAt = new Date().toISOString()
+      await Promise.all([
+        setChartCache(tmdbCacheKey, tmdbList),
+        setChartCache(imdbCacheKey, imdbList)
+      ])
+
+      const items = ranking === "tmdb" ? tmdbList : imdbList
+      return Response.json({ ok: true, items, updatedAt, source: "fresh", ranking })
     }
 
     return Response.json(

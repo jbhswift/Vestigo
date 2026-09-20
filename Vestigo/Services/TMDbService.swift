@@ -74,18 +74,7 @@ struct TMDbService {
         return items.uniqued()
     }
 
-    func topRated(kind: MediaKind, pages: Int = 5) async throws -> [MediaItem] {
-        guard kind == .movie || kind == .tv else { return [] }
-        let path = "/\(kind.tmdbPath)/top_rated"
-        return try await withThrowingTaskGroup(of: [MediaItem].self) { group in
-            for page in 1...max(pages, 1) {
-                group.addTask { try await self.fetchList(path: path, query: [], page: page) }
-            }
-            var all: [MediaItem] = []
-            for try await pageItems in group { all += pageItems }
-            return all.uniqued().sorted { $0.voteAverage > $1.voteAverage }
-        }
-    }
+
 
     func recommendations(for item: MediaItem) async throws -> [MediaItem] {
         let mediaType = item.kind == .tv ? "tv" : "movie"

@@ -15,6 +15,14 @@ final class CinemaSearchService: NSObject, ObservableObject, CLLocationManagerDe
     @Published var theaters: [CinemaTheater] = []
     @Published var isSearching: Bool = false
     @Published var lastError: String?
+    /// True once AMC has confirmed at least one showtime for this film — used to
+    /// hide the section entirely for films that are no longer in cinemas.
+    @Published var amcEverHadResults: Bool = false
+    /// True once the AMC search has completed (regardless of result count).
+    /// Distinguishes "search ran and found nothing nearby" from "search hasn't run yet".
+    @Published var amcSearchCompleted: Bool = false
+    /// When the cached AMC data was originally fetched from the AMC API (nil until first search completes).
+    @Published var dataLastUpdated: Date?
 
     private let manager = CLLocationManager()
     private var pendingContinuation: CheckedContinuation<CLLocation?, Never>?
@@ -95,12 +103,24 @@ final class CinemaSearchService: NSObject, ObservableObject, CLLocationManagerDe
         await enrichAMCShowtimes(filmTitle: filmTitle, date: date, userCoordinate: coord)
     }
 
-    private func enrichAMCShowtimes(filmTitle: String, date: Date, userCoordinate: CLLocationCoordinate2D) async {
+    func forceRefreshAMCShowtimes(filmTitle: String, date: Date) async {
+        guard let coord = userCoordinate else { return }
+        isSearching = true
+        theaters = theaters.filter { $0.chain != .amc }
+        amcEverHadResults = false
+        amcSearchCompleted = false
+        dataLastUpdated = nil
+        defer { isSearching = false }
+        await enrichAMCShowtimes(filmTitle: filmTitle, date: date, userCoordinate: coord, forceRefresh: true)
+    }
+
+    private func enrichAMCShowtimes(filmTitle: String, date: Date, userCoordinate: CLLocationCoordinate2D, forceRefresh: Bool = false) async {
         let result = await AMCShowtimesService.fetchShowtimes(
             filmTitle: filmTitle,
             date: date,
             lat: userCoordinate.latitude,
-            lon: userCoordinate.longitude
+            lon: userCoordinate.longitude,
+            forceRefresh: forceRefresh
         )
 
         guard result.succeeded else { return }
@@ -110,6 +130,7 @@ final class CinemaSearchService: NSObject, ObservableObject, CLLocationManagerDe
 
         // Build CinemaTheater entries from the API response, using API coordinates
         // or falling back to the user's location if the API didn't return them.
+        // Distance filtering is handled in the view so the user can adjust the radius.
         let apiTheaters: [CinemaTheater] = result.entries.compactMap { entry in
             guard !entry.showtimes.isEmpty else { return nil }
             let coord: CLLocationCoordinate2D
@@ -132,6 +153,9 @@ final class CinemaSearchService: NSObject, ObservableObject, CLLocationManagerDe
             )
         }
 
+        if !apiTheaters.isEmpty { amcEverHadResults = true }
+        amcSearchCompleted = true
+        dataLastUpdated = result.dataFetchedAt ?? Date()
         theaters = nonAMC + apiTheaters
     }
 

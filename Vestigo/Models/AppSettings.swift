@@ -61,6 +61,7 @@ struct AppSettings: Codable, Hashable {
     var describeItRecentSearches: [String] = []
     var recentlyViewedItems: [MediaItem] = []
     var socialExcitedForItemCache: [MediaItem] = []
+    var ratingSourceIMDbDefaultApplied: Bool = false
     enum CodingKeys: String, CodingKey {
         case recommendationStrength
         case appearance
@@ -122,6 +123,7 @@ struct AppSettings: Codable, Hashable {
         case socialMyRecordName
         case recentlyViewedItems
         case socialExcitedForItemCache
+        case ratingSourceIMDbDefaultApplied
     }
 
     init() {}
@@ -162,7 +164,12 @@ struct AppSettings: Codable, Hashable {
         warnBeforeReplacingFavourite = try container.decodeIfPresent(Bool.self, forKey: .warnBeforeReplacingFavourite) ?? warnBeforeReplacingFavourite
         promptToRateAfterMarkingWatched = try container.decodeIfPresent(Bool.self, forKey: .promptToRateAfterMarkingWatched) ?? promptToRateAfterMarkingWatched
         autoTrackWatchDate = try container.decodeIfPresent(Bool.self, forKey: .autoTrackWatchDate) ?? autoTrackWatchDate
-        preferredRatingSource = try container.decodeIfPresent(RatingSource.self, forKey: .preferredRatingSource) ?? preferredRatingSource
+        let ratingSourceAlreadyMigrated = (try? container.decodeIfPresent(Bool.self, forKey: .ratingSourceIMDbDefaultApplied)) ?? false
+        if ratingSourceAlreadyMigrated {
+            preferredRatingSource = try container.decodeIfPresent(RatingSource.self, forKey: .preferredRatingSource) ?? preferredRatingSource
+        }
+        // else: no stored migration flag → first load of this version, keep the .imdb default regardless of any previously saved value
+        ratingSourceIMDbDefaultApplied = true
 
         let savedHomeOrder = try container.decodeIfPresent([HomeCarousel].self, forKey: .homeCarouselOrder) ?? []
         let intendedHomeOrder: [HomeCarousel] = [.trending, .recommendations, .newReleases, .upcoming]

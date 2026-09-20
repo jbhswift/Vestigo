@@ -3,6 +3,8 @@ import Foundation
 struct AMCShowtimesResponse: Decodable {
     let ok: Bool
     let theaters: [AMCTheaterEntry]
+    /// Unix timestamp (ms) when this data was fetched from AMC — present for both cached and fresh responses.
+    let cachedAt: Double?
 }
 
 struct AMCTheaterEntry: Decodable {
@@ -31,21 +33,25 @@ enum AMCShowtimesService {
     struct Result {
         let entries: [TheaterResult]
         let succeeded: Bool
+        /// When the data was originally fetched from AMC (nil for failed requests or live responses without a timestamp).
+        let dataFetchedAt: Date?
 
-        static let failed = Result(entries: [], succeeded: false)
+        static let failed = Result(entries: [], succeeded: false, dataFetchedAt: nil)
     }
 
-    static func fetchShowtimes(filmTitle: String, date: Date, lat: Double, lon: Double) async -> Result {
+    static func fetchShowtimes(filmTitle: String, date: Date, lat: Double, lon: Double, forceRefresh: Bool = false) async -> Result {
         let base = "https://mtttuyvpjyugudkevchj.supabase.co/functions/v1/vestigo-api"
         var comps = URLComponents(string: base + "/amc-showtimes")
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        comps?.queryItems = [
+        var items: [URLQueryItem] = [
             URLQueryItem(name: "title", value: filmTitle),
             URLQueryItem(name: "date", value: formatter.string(from: date)),
             URLQueryItem(name: "lat", value: String(lat)),
             URLQueryItem(name: "lon", value: String(lon))
         ]
+        if forceRefresh { items.append(URLQueryItem(name: "force_refresh", value: "1")) }
+        comps?.queryItems = items
 
         guard let url = comps?.url else { return .failed }
         do {
@@ -83,7 +89,8 @@ enum AMCShowtimesService {
                 return TheaterResult(name: entry.name, lat: entry.lat, lon: entry.lon, showtimes: times)
             }
 
-            return Result(entries: entries, succeeded: decoded.ok)
+            let fetchedAt = decoded.cachedAt.map { Date(timeIntervalSince1970: $0 / 1000.0) }
+            return Result(entries: entries, succeeded: decoded.ok, dataFetchedAt: fetchedAt)
         } catch {
             return .failed
         }

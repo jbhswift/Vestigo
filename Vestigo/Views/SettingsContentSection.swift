@@ -11,6 +11,23 @@ struct SettingsContentSection: View {
 
         StreamingServicesSettingsSection(model: model)
 
+        HStack {
+            Text("Region")
+                .font(.headline.bold())
+            Spacer()
+            Picker("Region", selection: Binding(
+                get: { model.settings.streamingRegion },
+                set: { model.settings.streamingRegion = $0; model.saveSettings(); model.providerCache = [:] }
+            )) {
+                ForEach(StreamingRegion.allCases) { region in
+                    Text(region.displayName).tag(region)
+                }
+            }
+            .pickerStyle(.menu)
+            .foregroundStyle(model.settings.accentColor)
+        }
+        .settingBubble()
+
         VStack(alignment: .leading, spacing: 10) {
 
             VStack(alignment: .leading, spacing: 10) {
@@ -23,6 +40,11 @@ struct SettingsContentSection: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .liquidGlass(cornerRadius: 18)
+                .onChange(of: model.settings.preferredRatingSource) { _, newValue in
+                    if newValue == .imdb {
+                        model.refreshVisibleExternalRatings()
+                    }
+                }
                 Text("IMDb scores from OMDb are used for rating displays, filters, and sorts where available.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -334,24 +356,6 @@ private struct StreamingServicesSettingsSection: View {
                 Button("Manage") { showSheet = true }
                     .font(.subheadline)
                     .foregroundStyle(model.settings.accentColor)
-            }
-
-            Divider().opacity(0.3)
-
-            HStack {
-                Text("Region")
-                    .font(.subheadline)
-                Spacer()
-                Picker("Region", selection: Binding(
-                    get: { model.settings.streamingRegion },
-                    set: { model.settings.streamingRegion = $0; model.saveSettings(); model.providerCache = [:] }
-                )) {
-                    ForEach(StreamingRegion.allCases) { region in
-                        Text(region.displayName).tag(region)
-                    }
-                }
-                .pickerStyle(.menu)
-                .foregroundStyle(model.settings.accentColor)
             }
 
         }

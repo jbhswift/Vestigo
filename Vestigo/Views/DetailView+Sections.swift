@@ -297,8 +297,8 @@ extension DetailView {
                 ? (featured ? "bolt.heart.fill" : "bolt.heart")
                 : (featured ? "pin.fill" : "pin")
             let label = item.isUpcoming
-                ? (featured ? "Excited For" : "Add to Excited For")
-                : (featured ? "Featured on profile" : "Feature on profile")
+                ? (featured ? "Excited For" : "Excited For")
+                : (featured ? "Featured" : "Feature")
             let tint: Color = item.isUpcoming ? .orange : model.settings.accentColor
 
             HStack(spacing: 10) {
@@ -314,11 +314,8 @@ extension DetailView {
                             .font(.headline.bold())
                             .lineLimit(1)
                             .minimumScaleFactor(0.78)
-
-                        Spacer(minLength: 0)
                     }
                     .foregroundStyle(.primary)
-                    .padding(.horizontal, 14)
                     .frame(maxWidth: .infinity)
                     .frame(height: 46)
                     .liquidGlass(cornerRadius: 22)
@@ -455,6 +452,7 @@ extension DetailView {
         if item.kind == .movie && UserDefaults.standard.bool(forKey: "Vestigo.showCinemas") {
             CinemasNearYouSection(
                 filmTitle: item.title,
+                releaseDate: item.releaseDateValue,
                 service: cinemaService,
                 selectedDate: $cinemaSelectedDate,
                 accentColor: model.settings.accentColor

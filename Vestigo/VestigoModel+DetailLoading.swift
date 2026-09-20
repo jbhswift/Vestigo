@@ -382,6 +382,7 @@ extension VestigoModel {
 
     func loadExternalRatings(_ item: MediaItem, priority: Bool = false) async {
         guard item.kind == .movie || item.kind == .tv else { return }
+        guard settings.preferredRatingSource == .imdb else { return }
         guard externalRatingsCache[item.key] == nil else { return }
         guard !externalRatingInFlight.contains(item.key) else { return }
 

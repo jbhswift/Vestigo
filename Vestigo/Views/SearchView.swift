@@ -70,6 +70,7 @@ struct SearchView: View {
                                 }
                                 .padding(14)
                                 .liquidGlass(cornerRadius: 24)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .sheet(isPresented: $showingThematicSearch) {
@@ -92,6 +93,68 @@ struct SearchView: View {
                                 .buttonStyle(.plain)
                                 .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                             }
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Charts")
+                            .sectionTitle()
+                        VStack(spacing: 10) {
+                            Button {
+                                searchIsFocused = false
+                                model.searchFieldIsFocused = false
+                                model.searchPath.append(.chart(.movie))
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "trophy.fill")
+                                        .font(.title3.bold())
+                                        .foregroundStyle(.primary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Top 100 Movies")
+                                            .font(.subheadline.bold())
+                                            .foregroundStyle(.primary)
+                                        Text("The highest-rated films of all time")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(14)
+                                .liquidGlass(cornerRadius: 24)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                searchIsFocused = false
+                                model.searchFieldIsFocused = false
+                                model.searchPath.append(.chart(.tv))
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "trophy.fill")
+                                        .font(.title3.bold())
+                                        .foregroundStyle(.primary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Top 100 Series")
+                                            .font(.subheadline.bold())
+                                            .foregroundStyle(.primary)
+                                        Text("The highest-rated series of all time")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(14)
+                                .liquidGlass(cornerRadius: 24)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     } // end else (not focused)
