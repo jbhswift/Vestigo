@@ -2,9 +2,9 @@ import Foundation
 
 struct StreamingAvailabilityService {
     private let base = "https://mtttuyvpjyugudkevchj.supabase.co/functions/v1/vestigo-api"
-    
+
     func providers(for item: MediaItem, imdbID: String? = nil, regionCode: String = "US") async throws -> [StreamingOption] {
-        var comps = URLComponents(string: base + "/watchmode-sources")!
+        var comps = URLComponents(string: base + "/streaming-sources")!
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "kind", value: item.kind == .tv ? "tv" : "movie"),
             URLQueryItem(name: "country", value: regionCode),
@@ -19,22 +19,19 @@ struct StreamingAvailabilityService {
         }
         comps.queryItems = queryItems
         guard let url = comps.url else { throw URLError(.badURL) }
-        let response: WatchmodeSourcesResponse = try await fetch(url: url)
-        return response.sources
-    }
-    
-    private func fetch<T: Decodable>(url: URL) async throws -> T {
+
         let request = URLRequest(url: url)
         let (data, response) = try await URLSession.shared.data(for: request)
-        AnalyticsService.shared.track(.apiCallMade(service: "watchmode"))
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             throw URLError(.badServerResponse)
         }
-        return try JSONDecoder().decode(T.self, from: data)
+        let decoded = try JSONDecoder().decode(StreamingSourcesResponse.self, from: data)
+        AnalyticsService.shared.track(.apiCallMade(service: decoded.source ?? "streaming"))
+        return decoded.sources
     }
 }
 
-struct WatchmodeSourcesResponse: Decodable {
+struct StreamingSourcesResponse: Decodable {
     let ok: Bool
     let source: String?
     let tmdbID: Int?
