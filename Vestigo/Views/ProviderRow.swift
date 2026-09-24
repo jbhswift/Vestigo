@@ -5,11 +5,16 @@ import Foundation
 
 struct ProviderRow: View {
     let option: StreamingOption
+    let regionServiceCatalog: [RegionStreamingService]
     @Environment(\.openURL) private var openURL
     @Environment(\.imageRefreshToken) private var imageRefreshToken
 
     private var tappableURL: URL? {
         option.tappableURL
+    }
+
+    private var matchedRegionService: RegionStreamingService? {
+        option.matchedRegionService(in: regionServiceCatalog)
     }
 
     var body: some View {
@@ -51,11 +56,17 @@ struct ProviderRow: View {
 
     private var providerLogo: some View {
         let catalogService = option.matchedCatalogService
+        let tileColor: Color = {
+            if let hex = matchedRegionService?.themeColorHex { return Color(hex: hex) }
+            if let hex = catalogService?.brandColorHex { return Color(hex: hex) }
+            return .white.opacity(0.13)
+        }()
+
         return ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(catalogService.map { Color(hex: $0.brandColorHex) } ?? .white.opacity(0.13))
+                .fill(tileColor)
 
-            if let url = option.logoURL {
+            if let url = option.logoURL(regionServiceCatalog: regionServiceCatalog) {
                 AsyncImage(url: url.refreshedImageURL(token: imageRefreshToken)) { phase in
                     switch phase {
                     case .success(let image):
@@ -134,12 +145,19 @@ extension StreamingOption {
         KnownStreamingService.catalog.first { $0.matches(serviceName) }
     }
 
-    var logoURL: URL? {
-        // Prefer Brandfetch via catalog — higher quality than favicons
-        if let domain = matchedCatalogService?.domain {
-            return URL(string: "https://mtttuyvpjyugudkevchj.supabase.co/functions/v1/vestigo-api/brand-logo?domain=\(domain)&w=128&h=128")
+    func matchedRegionService(in catalog: [RegionStreamingService]) -> RegionStreamingService? {
+        let normalized = serviceName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        return catalog.first { service in
+            let name = service.name.lowercased()
+            return normalized.contains(name) || name.contains(normalized)
         }
-        // Fallback: Google favicon for services not yet in catalog
+    }
+
+    /// Logo resolution order: live MoTN region catalog → known-catalog Google-favicon guess → none (initials fallback).
+    func logoURL(regionServiceCatalog: [RegionStreamingService]) -> URL? {
+        if let regionMatch = matchedRegionService(in: regionServiceCatalog), let logoURL = regionMatch.logoURL {
+            return URL(string: logoURL)
+        }
         guard let domain = serviceLogoDomain else { return nil }
         var components = URLComponents(string: "https://www.google.com/s2/favicons")
         components?.queryItems = [

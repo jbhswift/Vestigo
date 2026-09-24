@@ -57,24 +57,85 @@ struct StreamingServicesSetupSheet: View {
     }
 }
 
+// MARK: - Picker item
+
+/// Unified shape for the "Manage streaming services" grid, merging the hand-curated
+/// `KnownStreamingService.catalog` (which carries TMDB provider IDs) with whatever else
+/// MoTN knows about for the current region (which doesn't). Static entries take priority
+/// on name collisions so curated TMDB mappings/colors are never shadowed by a dynamic entry.
+struct StreamingServicePickerItem: Identifiable {
+    let id: String
+    let displayName: String
+    let isFree: Bool
+    let iconLabel: String
+    let brandColorHex: String
+    let lightText: Bool
+    let logoURL: URL?
+
+    static func mergedCatalog(regionServiceCatalog: [RegionStreamingService]) -> [StreamingServicePickerItem] {
+        let staticItems = KnownStreamingService.catalog.map { service in
+            StreamingServicePickerItem(
+                id: service.id,
+                displayName: service.displayName,
+                isFree: service.isFree,
+                iconLabel: service.iconLabel,
+                brandColorHex: service.brandColorHex,
+                lightText: service.lightText,
+                logoURL: nil
+            )
+        }
+
+        let dynamicItems = regionServiceCatalog
+            .filter { dynamic in !KnownStreamingService.catalog.contains { $0.matches(dynamic.name) } }
+            .map { dynamic in
+                StreamingServicePickerItem(
+                    id: dynamic.id,
+                    displayName: dynamic.name,
+                    isFree: dynamic.isFree,
+                    iconLabel: Self.initials(for: dynamic.name),
+                    brandColorHex: dynamic.themeColorHex ?? "#3A3A3C",
+                    lightText: true,
+                    logoURL: dynamic.logoURL.flatMap(URL.init(string:))
+                )
+            }
+
+        return staticItems + dynamicItems
+    }
+
+    private static func initials(for name: String) -> String {
+        let letters = name
+            .split { !$0.isLetter && !$0.isNumber }
+            .compactMap { $0.first }
+            .prefix(2)
+            .map { String($0).uppercased() }
+            .joined()
+        return letters.isEmpty ? String(name.prefix(2)).uppercased() : letters
+    }
+}
+
 struct StreamingServicesPicker: View {
     @ObservedObject var model: VestigoModel
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 3)
 
+    private var mergedCatalog: [StreamingServicePickerItem] {
+        StreamingServicePickerItem.mergedCatalog(regionServiceCatalog: model.regionServiceCatalog)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             let subscribed = model.settings.subscribedServiceNames
-            let paid = KnownStreamingService.catalog.filter { !$0.isFree }
-            let free = KnownStreamingService.catalog.filter { $0.isFree }
+            let catalog = mergedCatalog
+            let paid = catalog.filter { !$0.isFree }
+            let free = catalog.filter { $0.isFree }
 
             serviceGrid(title: "Subscription", services: paid, subscribed: subscribed)
             serviceGrid(title: "Free", services: free, subscribed: subscribed)
 
             if !subscribed.isEmpty {
                 Button("Clear all") {
-                    for svc in KnownStreamingService.catalog {
-                        model.settings.subscribedServiceNames.remove(svc.id)
+                    for item in catalog {
+                        model.settings.subscribedServiceNames.remove(item.id)
                     }
                     model.saveSettings()
                 }
@@ -85,7 +146,7 @@ struct StreamingServicesPicker: View {
     }
 
     @ViewBuilder
-    private func serviceGrid(title: String, services: [KnownStreamingService], subscribed: Set<String>) -> some View {
+    private func serviceGrid(title: String, services: [StreamingServicePickerItem], subscribed: Set<String>) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title.uppercased())
                 .font(.caption.bold())
@@ -109,7 +170,7 @@ struct StreamingServicesPicker: View {
 }
 
 struct ServiceIconButton: View {
-    let service: KnownStreamingService
+    let service: StreamingServicePickerItem
     let isSelected: Bool
     let accentColor: Color
     let action: () -> Void
@@ -151,14 +212,18 @@ struct ServiceIconButton: View {
             .fill(Color(hex: service.brandColorHex))
             .frame(width: iconSize, height: iconSize)
             .overlay {
-                AsyncImage(url: service.logoURL) { phase in
-                    if case .success(let image) = phase {
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        textLabel
+                if let logoURL = service.logoURL {
+                    AsyncImage(url: logoURL) { phase in
+                        if case .success(let image) = phase {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } else {
+                            textLabel
+                        }
                     }
+                } else {
+                    textLabel
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
