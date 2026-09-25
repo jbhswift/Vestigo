@@ -23,12 +23,16 @@ struct DetailView: View {
     @ObservedObject var model: VestigoModel
     var allowsPersonSheet: Bool = true
     @Environment(\.imageRefreshToken) var imageRefreshToken
+    @AppStorage("Vestigo.devMode") var devMode: Bool = false
     @State var showCast = false
     @State var showCollections = false
     @State var selectedNestedItem: MediaItem?
     @State var isPosterPreviewPresented = false
     @State var showWatchedDatePopover = false
     @State var showingFriendRating = true
+    @State var providerLoadStartedAt: Date?
+    @State var providerLoadElapsed: TimeInterval = 0
+    @State var providerLoadFinishedElapsed: TimeInterval?
     #if canImport(CoreLocation)
     @StateObject var cinemaService = CinemaSearchService()
     @State var cinemaSelectedDate: Date = Calendar.current.startOfDay(for: Date())
@@ -39,9 +43,10 @@ struct DetailView: View {
     var isTMDbFallback: Bool { model.tmdbFallbackKeys.contains(item.key) }
     var visibleProviders: [StreamingOption]? {
         guard let filtered = providers?.filter({ !$0.serviceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { return nil }
+        let collapsed = StreamingOption.collapsedForProviderDisplay(filtered)
         let subscribed = model.settings.subscribedServiceNames
-        guard !subscribed.isEmpty else { return filtered }
-        return filtered.sorted { a, b in
+        guard !subscribed.isEmpty else { return collapsed }
+        return collapsed.sorted { a, b in
             let aIn = a.isSubscribed(in: subscribed)
             let bIn = b.isSubscribed(in: subscribed)
             if aIn != bIn { return aIn }
@@ -49,6 +54,22 @@ struct DetailView: View {
         }
     }
     var relatedMediaSections: [RelatedMediaSection] { model.relatedMediaCache[item.key] ?? [] }
+
+    var isProviderTimingRunning: Bool {
+        devMode && providers == nil && providerLoadStartedAt != nil && providerLoadFinishedElapsed == nil
+    }
+
+    var providerLoadTimingText: String? {
+        guard devMode, let startedAt = providerLoadStartedAt else { return nil }
+        if let providerLoadFinishedElapsed {
+            return "Where to watch loaded in \(formattedProviderLoadTime(providerLoadFinishedElapsed))."
+        }
+        guard providers == nil else {
+            let elapsed = max(providerLoadElapsed, Date().timeIntervalSince(startedAt))
+            return "Where to watch loaded in \(formattedProviderLoadTime(elapsed))."
+        }
+        return "Where to watch loading \(formattedProviderLoadTime(max(providerLoadElapsed, 0)))."
+    }
 
     enum ProviderAvailability { case available, paidOnly, unavailable }
 
@@ -87,6 +108,21 @@ struct DetailView: View {
             .presentationBackground(.clear)
             .presentationCornerRadius(54)
             .task { await model.loadDetail(item) }
+            .task(id: model.settings.streamingRegion) {
+                async let tmdbLogos: Void = model.loadTMDbRegionProviders()
+                async let regionCatalog: Void = model.loadRegionServiceCatalog()
+                _ = await (tmdbLogos, regionCatalog)
+            }
+            .task(id: isProviderTimingRunning) {
+                guard isProviderTimingRunning else { return }
+                while isProviderTimingRunning && !Task.isCancelled {
+                    providerLoadElapsed = Date().timeIntervalSince(providerLoadStartedAt ?? Date())
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
+            }
+            .onAppear { updateProviderLoadTiming() }
+            .onChange(of: providers != nil) { _, _ in updateProviderLoadTiming() }
+            .onChange(of: devMode) { _, _ in updateProviderLoadTiming() }
             .onDisappear { model.friendDetailContext = nil }
             .sheet(isPresented: $showCollections) {
                 AddToCollectionSheet(item: item, model: model)
@@ -148,6 +184,31 @@ struct DetailView: View {
         .scrollDismissesKeyboard(.immediately)
         .scrollIndicators(.hidden)
         .scrollViewTouchTuning(axis: .vertical)
+    }
+
+    func updateProviderLoadTiming() {
+        guard devMode else {
+            providerLoadStartedAt = nil
+            providerLoadElapsed = 0
+            providerLoadFinishedElapsed = nil
+            return
+        }
+
+        if providers == nil {
+            if providerLoadStartedAt == nil {
+                providerLoadStartedAt = Date()
+                providerLoadElapsed = 0
+                providerLoadFinishedElapsed = nil
+            }
+        } else if let startedAt = providerLoadStartedAt, providerLoadFinishedElapsed == nil {
+            let elapsed = Date().timeIntervalSince(startedAt)
+            providerLoadElapsed = elapsed
+            providerLoadFinishedElapsed = elapsed
+        }
+    }
+
+    func formattedProviderLoadTime(_ elapsed: TimeInterval) -> String {
+        String(format: "%.1fs", elapsed)
     }
 
     func openNestedItem(_ item: MediaItem) {

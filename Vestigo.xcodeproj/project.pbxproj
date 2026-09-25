@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		62EDA13A304DF1BB00E7DF22 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 62EDA139304DF1BB00E7DF22 /* Sentry */; };
 		62EDA13D304DF2AE00E7DF22 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = 62EDA13C304DF2AE00E7DF22 /* PostHog */; };
+		62FE636A3066125200553ACA /* SVGView in Frameworks */ = {isa = PBXBuildFile; productRef = 62FE63693066125200553ACA /* SVGView */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +71,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				62FE636A3066125200553ACA /* SVGView in Frameworks */,
 				62EDA13A304DF1BB00E7DF22 /* Sentry in Frameworks */,
 				62EDA13D304DF2AE00E7DF22 /* PostHog in Frameworks */,
 			);
@@ -142,6 +144,7 @@
 			packageProductDependencies = (
 				62EDA139304DF1BB00E7DF22 /* Sentry */,
 				62EDA13C304DF2AE00E7DF22 /* PostHog */,
+				62FE63693066125200553ACA /* SVGView */,
 			);
 			productName = Vestigo;
 			productReference = 620094C42FB15C85000C2463 /* Vestigo.app */;
@@ -228,6 +231,7 @@
 			packageReferences = (
 				62EDA137304DF0FA00E7DF22 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 				62EDA138304DF1BB00E7DF22 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
+				62FE63683066124900553ACA /* XCRemoteSwiftPackageReference "SVGView" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 620094C52FB15C85000C2463 /* Products */;
@@ -438,8 +442,10 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Vestigo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Vestigo uses calendar access to add release dates for upcoming movies and TV seasons.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Used to take a profile photo for your Vestigo Friends profile.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Vestigo uses your contacts to make friends.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Vestigo uses your location to find nearby cinema showings for new movies.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Used to choose a profile photo for your Vestigo Friends profile.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -480,8 +486,10 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Vestigo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Vestigo uses calendar access to add release dates for upcoming movies and TV seasons.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Used to take a profile photo for your Vestigo Friends profile.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Vestigo uses your contacts to make friends.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Vestigo uses your location to find nearby cinema showings for new movies.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Used to choose a profile photo for your Vestigo Friends profile.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -646,6 +654,14 @@
 			traits = (
 			);
 		};
+		62FE63683066124900553ACA /* XCRemoteSwiftPackageReference "SVGView" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/exyte/SVGView";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.6;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -658,6 +674,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 62EDA137304DF0FA00E7DF22 /* XCRemoteSwiftPackageReference "posthog-ios" */;
 			productName = PostHog;
+		};
+		62FE63693066125200553ACA /* SVGView */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62FE63683066124900553ACA /* XCRemoteSwiftPackageReference "SVGView" */;
+			productName = SVGView;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

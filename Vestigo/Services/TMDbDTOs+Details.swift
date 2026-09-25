@@ -207,7 +207,9 @@ struct TMDbWatchProvidersResponse: Decodable, Hashable {
                     type: group.type,
                     priceText: group.price,
                     qualityText: "",
-                    openURL: region.link
+                    openURL: region.link,
+                    providerID: provider.providerID,
+                    logoPath: provider.logoPath
                 )
             }
         }
@@ -223,10 +225,14 @@ struct TMDbWatchProviderRegion: Decodable, Hashable {
 }
 
 struct TMDbWatchProvider: Decodable, Hashable {
+    let providerID: Int
     let providerName: String
+    let logoPath: String?
 
     enum CodingKeys: String, CodingKey {
+        case providerID = "provider_id"
         case providerName = "provider_name"
+        case logoPath = "logo_path"
     }
 }
 

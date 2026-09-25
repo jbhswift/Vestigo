@@ -52,6 +52,9 @@ final class VestigoModel: ObservableObject {
     @Published var detailsCache: [MediaKey: MediaDetail] = [:]
     @Published var externalRatingsCache: [MediaKey: ExternalRatings] = [:]
     @Published var providerCache: [MediaKey: [StreamingOption]] = [:]
+    @Published var regionServiceCatalogsByRegion: [String: [RegionStreamingService]] = [:]
+    @Published var tmdbProvidersByRegion: [String: [TMDbWatchProviderLogoDTO]] = [:]
+    @Published var tmdbGlobalProviders: [TMDbWatchProviderLogoDTO] = []
     @Published var tmdbFallbackKeys: Set<MediaKey> = []
     var watchmodeBackgroundRetried: Set<MediaKey> = []
     var describeItResultsCache: [String: [ThematicSearchResult]] = [:]
@@ -107,6 +110,7 @@ final class VestigoModel: ObservableObject {
     // Keep this wiring nearby in case we decide to re-evaluate TasteDive as a future supplemental source.
     // private let tasteDive = TasteDiveService()
     let streaming = StreamingAvailabilityService()
+    let streamingCatalog = StreamingCatalogService()
     let relatedMedia = RelatedMediaService()
     let backend = VestigoBackendClient()
     let releaseCalendar = ReleaseCalendarService()
@@ -120,6 +124,14 @@ final class VestigoModel: ObservableObject {
     var publishTask: Task<Void, Never>?
     var searchRequestID = UUID()
     var isApplyingCloudSnapshot = false
+    var regionServiceCatalog: [RegionStreamingService] {
+        regionServiceCatalogsByRegion[settings.streamingRegion.rawValue] ?? []
+    }
+
+    var tmdbRegionProviders: [TMDbWatchProviderLogoDTO] {
+        tmdbProvidersByRegion[settings.streamingRegion.rawValue] ?? []
+    }
+
     var mediaSearchCache: [String: [MediaItem]] = [:]
     var peopleSearchCache: [String: [PersonSummary]] = [:]
     // Disabled with TasteDiveService; no active path should credit or query TasteDive right now.

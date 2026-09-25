@@ -202,49 +202,6 @@ export async function GET() {
     })
   }
 
-  // ── Brandfetch (live via /v2/me) ─────────────────────────────────────────
-  const brandfetchKey = process.env.BRANDFETCH_CLIENT_ID
-  if (brandfetchKey) {
-    try {
-      const bfRes = await fetch('https://api.brandfetch.io/v2/me', {
-        headers: { Authorization: `Bearer ${brandfetchKey}` },
-        next: { revalidate: 300 },
-      })
-      if (!bfRes.ok) throw new Error(`HTTP ${bfRes.status}`)
-      const bf = await bfRes.json()
-      const bfUsed: number | null = bf.requests?.used ?? bf.quota?.used ?? null
-      const bfLimit: number | null = bf.requests?.limit ?? bf.quota?.limit ?? 1_000_000
-      const bfResetRaw: string | null = bf.requests?.resetsAt ?? bf.quota?.resetsAt ?? null
-      const bfResetsAt = bfResetRaw ? new Date(bfResetRaw).toISOString() : endOfMonthReset()
-      quotas.push({
-        key: 'brandfetch', name: 'Brandfetch',
-        limit: bfLimit, limitUnit: 'calls', period: 'month',
-        used: bfUsed, allTime: null, resetsAt: bfResetsAt,
-        dataSource: 'live',
-        dashboardUrl: 'https://brandfetch.com/dashboard',
-      })
-    } catch (e) {
-      quotas.push({
-        key: 'brandfetch', name: 'Brandfetch',
-        limit: 1_000_000, limitUnit: 'calls', period: 'month',
-        used: bestCount('brandfetch'), allTime: null, resetsAt: endOfMonthReset(),
-        dataSource: 'live',
-        note: `API error: ${String(e)} — count from PostHog.`,
-        dashboardUrl: 'https://brandfetch.com/dashboard',
-      })
-    }
-  } else {
-    quotas.push({
-      key: 'brandfetch', name: 'Brandfetch',
-      limit: 1_000_000, limitUnit: 'calls', period: 'month',
-      used: bestCount('brandfetch'), allTime: null, resetsAt: endOfMonthReset(),
-      dataSource: phCounts['brandfetch'] != null ? 'live' : 'static',
-      unconfigured: true,
-      note: 'Add BRANDFETCH_CLIENT_ID to Vercel env vars.',
-      dashboardUrl: 'https://brandfetch.com/dashboard',
-    })
-  }
-
   // ── OpenRouter (call count from Vestigo KV; spend from provider API as note) ──
   const openrouterKey = process.env.OPENROUTER_API_KEY
   if (openrouterKey) {

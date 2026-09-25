@@ -9,24 +9,7 @@ struct SettingsContentSection: View {
             .sectionTitle()
             .padding(.top, 6)
 
-        StreamingServicesSettingsSection(model: model)
-
-        HStack {
-            Text("Region")
-                .font(.headline.bold())
-            Spacer()
-            Picker("Region", selection: Binding(
-                get: { model.settings.streamingRegion },
-                set: { model.settings.streamingRegion = $0; model.saveSettings(); model.providerCache = [:] }
-            )) {
-                ForEach(StreamingRegion.allCases) { region in
-                    Text(region.displayName).tag(region)
-                }
-            }
-            .pickerStyle(.menu)
-            .foregroundStyle(model.settings.accentColor)
-        }
-        .settingBubble()
+        StreamingAvailabilitySettingsSection(model: model)
 
         VStack(alignment: .leading, spacing: 10) {
 
@@ -337,12 +320,12 @@ struct SettingsContentSection: View {
 
 // MARK: - Private helper (only used by SettingsContentSection)
 
-private struct StreamingServicesSettingsSection: View {
+private struct StreamingAvailabilitySettingsSection: View {
     @ObservedObject var model: VestigoModel
     @State private var showSheet = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Streaming Services")
@@ -358,6 +341,29 @@ private struct StreamingServicesSettingsSection: View {
                     .foregroundStyle(model.settings.accentColor)
             }
 
+            Divider()
+                .overlay(.white.opacity(0.08))
+
+            HStack {
+                Text("Region")
+                    .font(.headline.bold())
+                Spacer()
+                Picker("Region", selection: Binding(
+                    get: { model.settings.streamingRegion },
+                    set: { newValue in
+                        model.settings.streamingRegion = newValue
+                        model.saveSettings()
+                        model.providerCache = [:]
+                        Task { await model.loadStreamingServiceCatalog() }
+                    }
+                )) {
+                    ForEach(StreamingRegion.allCases.sorted(by: { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending })) { region in
+                        Text(region.displayName).tag(region)
+                    }
+                }
+                .pickerStyle(.menu)
+                .foregroundStyle(model.settings.accentColor)
+            }
         }
         .settingBubble()
         .sheet(isPresented: $showSheet) {

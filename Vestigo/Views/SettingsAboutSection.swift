@@ -108,6 +108,7 @@ private struct DevToolsPanel: View {
                 cacheRow("Ratings",           count: model.externalRatingsCache.count)  { model.clearExternalRatingsCache() }
                 cacheRow("Details",           count: model.detailsCache.count)           { model.detailsCache = [:] }
                 cacheRow("Streaming",         count: model.providerCache.count)          { model.providerCache = [:] }
+                cacheRow("Provider catalogs", count: model.providerCatalogCacheCount)    { model.clearProviderCatalogCaches() }
                 cacheRow("Related media",     count: model.relatedMediaCache.count)      { model.relatedMediaCache = [:] }
                 cacheRow("Person credits",    count: model.personCreditsCache.count)     { model.personCreditsCache = [:] }
                 cacheRow("Person details",    count: model.personDetails.count)          { model.personDetails = [:] }
@@ -296,6 +297,7 @@ private struct DevToolsPanel: View {
         ratings:     \(model.externalRatingsCache.count)
         details:     \(model.detailsCache.count)
         streaming:   \(model.providerCache.count)
+        providers:   \(model.providerCatalogCacheCount)
         related:     \(model.relatedMediaCache.count)
         people:      \(model.personCreditsCache.count)
         """

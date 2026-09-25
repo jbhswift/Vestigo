@@ -415,6 +415,7 @@ extension DetailView {
                 .sectionTitle()
             providerStatus
             providerRows
+            providerTimingStatus
         }
     }
 
@@ -431,17 +432,25 @@ extension DetailView {
     @ViewBuilder var providerRows: some View {
         if let visibleProviders, !visibleProviders.isEmpty {
             ForEach(visibleProviders.prefix(12)) { provider in
-                ProviderRow(option: provider)
+                ProviderRow(option: provider, regionServiceCatalog: model.regionServiceCatalog, tmdbProviderLogos: model.tmdbRegionProviders)
             }
-            .allowsHitTesting(!isTMDbFallback)
-            .opacity(isTMDbFallback ? 0.45 : 1)
             if isTMDbFallback {
-                Text("Availability data from TMDb — no prices or direct links. Watchmode data currently unavailable for this title.")
+                Text("Availability data from TMDb.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 2)
             }
+        }
+    }
+
+    @ViewBuilder var providerTimingStatus: some View {
+        if let providerLoadTimingText {
+            Text(providerLoadTimingText)
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 2)
         }
     }
 

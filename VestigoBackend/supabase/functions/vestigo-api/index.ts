@@ -1192,7 +1192,7 @@ function incrementServiceCall(service: string): void {
   }
 }
 
-const SERVICE_USAGE_KEYS = ["tmdb", "watchmode", "tvdb", "wikidata", "openrouter", "amc", "brandfetch", "youtube", "supabase_edge"]
+const SERVICE_USAGE_KEYS = ["tmdb", "watchmode", "tvdb", "wikidata", "openrouter", "amc", "youtube", "supabase_edge"]
 
 async function getServiceUsage(days = 30): Promise<Record<string, number>> {
   const kv = await Deno.openKv()
@@ -2231,35 +2231,6 @@ Rules:
       for (let i = 0; i < keys.length; i++) incrementServiceCall("youtube")
 
       return Response.json({ ok: true, shortKeys })
-    }
-
-    if (url.pathname.endsWith("/brand-logo")) {
-      const domain = url.searchParams.get("domain") ?? ""
-      const w = url.searchParams.get("w") ?? "128"
-      const h = url.searchParams.get("h") ?? "128"
-      const clientId = Deno.env.get("BRANDFETCH_CLIENT_ID")
-
-      if (!clientId) {
-        return new Response("Missing BRANDFETCH_CLIENT_ID", { status: 500 })
-      }
-
-      if (!domain) {
-        return new Response("Missing domain", { status: 400 })
-      }
-
-      const upstream = await fetchWithTimeout(
-        `https://cdn.brandfetch.io/${domain}/w/${w}/h/${h}/fallback/404?c=${clientId}`
-      )
-
-      if (upstream.ok) incrementServiceCall("brandfetch")
-
-      return new Response(upstream.body, {
-        status: upstream.status,
-        headers: {
-          "Content-Type": upstream.headers.get("Content-Type") ?? "image/png",
-          "Cache-Control": "public, max-age=86400",
-        },
-      })
     }
 
     if (url.pathname.endsWith("/service-usage")) {

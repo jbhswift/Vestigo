@@ -56,7 +56,7 @@ struct AppSettings: Codable, Hashable {
     var omdbLastRequestDate: String = ""
     var subscribedServiceNames: Set<String> = []
     var hasSeenStreamingSetup: Bool = false
-    var streamingRegion: StreamingRegion = .us
+    var streamingRegion: StreamingRegion = .unitedStates
     var pickForMeRecentSearches: [PickForMeRecentSearch] = []
     var describeItRecentSearches: [String] = []
     var recentlyViewedItems: [MediaItem] = []

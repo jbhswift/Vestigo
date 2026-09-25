@@ -459,6 +459,7 @@ extension VestigoModel {
         detailsCache = [:]
         providerCache = [:]
         tmdbFallbackKeys = []
+        clearProviderCatalogCaches()
         Storage.save([MediaKey: [StreamingOption]](), key: "Vestigo.providerCache")
         relatedMediaCache = [:]
         personCreditsCache = [:]

@@ -85,6 +85,47 @@ extension VestigoModel {
         schedulePublicProfilePublish()
     }
 
+    func loadStreamingServiceCatalog() async {
+        async let motnLoad: Void = loadRegionServiceCatalog()
+        async let tmdbLoad: Void = loadTMDbRegionProviders()
+        _ = await (motnLoad, tmdbLoad)
+    }
+
+    func loadRegionServiceCatalog() async {
+        let region = settings.streamingRegion.rawValue
+        guard regionServiceCatalogsByRegion[region] == nil else { return }
+        do {
+            regionServiceCatalogsByRegion[region] = try await streamingCatalog.services(forRegion: region)
+        } catch { }
+    }
+
+    func loadTMDbRegionProviders() async {
+        let region = settings.streamingRegion.rawValue
+        guard tmdbProvidersByRegion[region] == nil else { return }
+        do {
+            tmdbProvidersByRegion[region] = try await tmdb.watchProviders(regionCode: region)
+        } catch { }
+    }
+
+    func loadTMDbGlobalProviders() async {
+        guard tmdbGlobalProviders.isEmpty else { return }
+        do {
+            tmdbGlobalProviders = try await tmdb.watchProviders()
+        } catch { }
+    }
+
+    var providerCatalogCacheCount: Int {
+        regionServiceCatalogsByRegion.values.reduce(0) { $0 + $1.count }
+            + tmdbProvidersByRegion.values.reduce(0) { $0 + $1.count }
+            + tmdbGlobalProviders.count
+    }
+
+    func clearProviderCatalogCaches() {
+        regionServiceCatalogsByRegion = [:]
+        tmdbProvidersByRegion = [:]
+        tmdbGlobalProviders = []
+    }
+
     func schedulePublicProfilePublish() {
         publishTask?.cancel()
         publishTask = Task { [weak self] in

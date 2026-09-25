@@ -135,6 +135,24 @@ struct TMDbService {
         return Array((response.results ?? []).prefix(3).map(\.id))
     }
 
+    func watchProviders(regionCode: String? = nil) async throws -> [TMDbWatchProviderLogoDTO] {
+        let query = regionCode.map { [URLQueryItem(name: "watch_region", value: $0.uppercased())] } ?? []
+        async let movieResponse: TMDbWatchProviderListResponse = fetch(path: "/watch/providers/movie", query: query)
+        async let tvResponse: TMDbWatchProviderListResponse = fetch(path: "/watch/providers/tv", query: query)
+        let responses = try await [movieResponse, tvResponse]
+
+        var providersByID: [Int: TMDbWatchProviderLogoDTO] = [:]
+        for provider in responses.flatMap(\.results) {
+            providersByID[provider.providerID] = provider
+        }
+        return providersByID.values.sorted {
+            if ($0.displayPriority ?? Int.max) != ($1.displayPriority ?? Int.max) {
+                return ($0.displayPriority ?? Int.max) < ($1.displayPriority ?? Int.max)
+            }
+            return $0.providerName.localizedCaseInsensitiveCompare($1.providerName) == .orderedAscending
+        }
+    }
+
     // MARK: - Core fetch helpers
 
     func fetchList(path: String, query: [URLQueryItem]) async throws -> [MediaItem] {
