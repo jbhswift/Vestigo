@@ -31,10 +31,6 @@ struct TrailerVideo: Identifiable, Hashable {
         guard ["Trailer", "Teaser"].contains(where: { dto.type.localizedCaseInsensitiveCompare($0) == .orderedSame }) else {
             return nil
         }
-        // Reject YouTube Shorts mislabeled as Trailer/Teaser in TMDb
-        let lowerName = dto.name.lowercased()
-        guard !lowerName.contains("#short") else { return nil }
-        guard lowerName.range(of: "\\bshorts?\\b", options: .regularExpression) == nil else { return nil }
 
         id = dto.id
         key = trimmedKey

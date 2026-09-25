@@ -190,12 +190,7 @@ extension VestigoModel {
             score += 0.3
         }
 
-        score += pickForMePersonalizationScore(for: item) * 0.22  // was 0.18 — library signal more important without Groq
-
-        // -- GROQ SCORE BONUSES (disabled with Groq path) --
-        // if thematicCandidateKeys.contains(item.key) { score += 20.0 }
-        // if let rank = rerankScores[item.key] { score += max(0.0, 16.0 - Double(rank - 1) * 1.5) }
-        // -- END GROQ BONUSES --
+        score += pickForMePersonalizationScore(for: item) * 0.22  // library signal is the primary personalization input
 
         return score
     }

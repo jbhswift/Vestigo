@@ -12,9 +12,6 @@ import CoreLocation
 #if canImport(WebKit)
 import WebKit
 #endif
-#if canImport(UserNotifications)
-import UserNotifications
-#endif
 
 // MARK: - Detail
 

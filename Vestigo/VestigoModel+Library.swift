@@ -278,6 +278,7 @@ extension VestigoModel {
         guard library.isWatched(item.key) else { return }
         library.items[item.key] = item
         library.ratings[item.key] = rating
+        AnalyticsService.shared.track(.itemRated(rating: rating))
         generateDynamicCollections(from: item)
         saveLocalSoon()
         scheduleRecommendationsRefresh()

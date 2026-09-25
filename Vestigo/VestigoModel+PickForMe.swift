@@ -1,8 +1,5 @@
 import SwiftUI
 import Foundation
-#if canImport(FoundationModels)
-import FoundationModels
-#endif
 
 extension VestigoModel {
 
@@ -17,19 +14,6 @@ extension VestigoModel {
         let wantsNewReleaseResults = answers.releaseAge == .newReleases
         var sourceMaterialCandidateKeys: Set<MediaKey> = []
         var sourceMaterialItems: [MediaItem] = []
-
-        // -- GROQ PATH (disabled — re-enable by setting useGroq = true) --
-        // let useGroq = false
-        // let thematicQuery = answers.pickForMeGroqFullQuery ?? answers.pickForMeThematicQuery
-        // var thematicCandidates: [MediaItem] = []
-        // var rerankScores: [MediaKey: Int] = [:]
-        // if useGroq, let query = thematicQuery {
-        //     thematicCandidates = await pickForMeThematicCandidates(query: query, filter: effectiveFilter)
-        //     if thematicCandidates.count >= 5 {
-        //         rerankScores = await pickForMeGroqRerank(candidates: thematicCandidates, query: query)
-        //     }
-        // }
-        // -- END GROQ PATH --
 
         if let sourceMaterial = answers.sourceMaterial, sourceMaterial != .noPreference {
             do {

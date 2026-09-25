@@ -88,7 +88,7 @@ struct AboutInfoView: View {
             VStack(alignment: .center, spacing: 6) {
                 Text("Your library and preferences are stored on-device and in iCloud where enabled.")
                 Text("Vestigo was vibe coded: AI assisted with code implementation, while the product thinking, decisions, review, and non-coding work were all done by people.")
-                Text("Vestigo is not affiliated with TMDB, IMDb, OMDb, TheTVDB, Watchmode, YouTube, Brandfetch, Wikimedia, or their parent companies.")
+                Text("Vestigo is not affiliated with TMDB, IMDb, OMDb, TheTVDB, Watchmode, YouTube, Wikimedia, or their parent companies.")
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -304,17 +304,6 @@ struct AttributionProvider: Identifiable {
             url: URL(string: "https://www.youtube.com/")!,
             logoURL: nil,
             logoAssetName: "YouTubeLogo",
-            logoText: nil,
-            logoHeight: 30
-        ),
-        AttributionProvider(
-            id: "brandfetch",
-            name: "Brandfetch",
-            shortLabel: "BF",
-            description: "Streaming service brand logos and assets are powered by Brandfetch.",
-            url: URL(string: "https://brandfetch.com/")!,
-            logoURL: nil,
-            logoAssetName: "BrandfetchLogo",
             logoText: nil,
             logoHeight: 30
         ),

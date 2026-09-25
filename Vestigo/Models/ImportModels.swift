@@ -160,13 +160,6 @@ struct WatchedImportReport {
 }
 
 
-struct CloudLibrarySnapshot: Codable {
-    let modifiedAt: Date
-    let library: UserLibrary
-    let settings: AppSettings
-    let externalRatings: [MediaKey: ExternalRatings]
-}
-
 struct HomeFeedCache: Codable {
     let cachedAt: Date
     let filter: MediaFilter

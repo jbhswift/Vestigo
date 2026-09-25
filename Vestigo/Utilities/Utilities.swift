@@ -243,10 +243,6 @@ extension Array where Element == MediaItem {
         return direction == .ascending ? result.reversed() : result
     }
 
-    func sortedByCategoryRank() -> [MediaItem] {
-        sorted { ($0.releaseDateValue ?? .distantPast) > ($1.releaseDateValue ?? .distantPast) }
-    }
-
     func prefixArray(_ count: Int) -> [MediaItem] {
         Array(prefix(count))
     }

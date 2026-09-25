@@ -60,7 +60,7 @@ struct PickForMeInfoSheet: View {
                 Text("Getting better results")
                     .font(.title2.bold())
 
-                Text("Genre flavor and deal breakers are hard cuts — every extra one reduces the pool. Mood and secondary are layered — more gives Describe It more surface area to match against.")
+                Text("Genre flavor and deal breakers are hard cuts — every extra one reduces the pool. Mood and secondary are layered — more gives the algorithm more surface area to match against.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 

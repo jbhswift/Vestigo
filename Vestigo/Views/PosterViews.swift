@@ -13,8 +13,25 @@ struct PosterView: View {
     var isFavourite = false
     var favouriteColor: Color = .yellow
     @Environment(\.imageRefreshToken) private var imageRefreshToken
+    @Environment(\.isLowPowerModeActive) private var isLowPowerModeActive
 
     var body: some View {
+        Group {
+            if isLowPowerModeActive {
+                // A single flattened shadow instead of two, since Low Power Mode
+                // throttles GPU clocks and this view is rendered per-tile across
+                // every grid in the app.
+                core.compositingGroup()
+                    .shadow(color: .black.opacity(0.30), radius: 10, x: 0, y: 6)
+            } else {
+                core.compositingGroup()
+                    .shadow(color: .black.opacity(0.36), radius: 20, x: 0, y: 12)
+                    .shadow(color: .white.opacity(0.08), radius: 8, x: -3, y: -3)
+            }
+        }
+    }
+
+    private var core: some View {
         ZStack {
             RoundedRectangle(cornerRadius: width * 0.18, style: .continuous)
                 .fill(item.genreGradient)
@@ -44,8 +61,6 @@ struct PosterView: View {
             RoundedRectangle(cornerRadius: width * 0.18, style: .continuous)
                 .stroke(.white.opacity(0.22), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.36), radius: 20, x: 0, y: 12)
-        .shadow(color: .white.opacity(0.08), radius: 8, x: -3, y: -3)
     }
 }
 
@@ -54,8 +69,14 @@ struct PersonImageView: View {
     let width: CGFloat
     let height: CGFloat
     @Environment(\.imageRefreshToken) private var imageRefreshToken
+    @Environment(\.isLowPowerModeActive) private var isLowPowerModeActive
 
     var body: some View {
+        core.compositingGroup()
+            .shadow(color: .black.opacity(0.24), radius: isLowPowerModeActive ? 6 : 14, y: isLowPowerModeActive ? 4 : 8)
+    }
+
+    private var core: some View {
         ZStack {
             RoundedRectangle(cornerRadius: width * 0.18, style: .continuous)
                 .fill(.white.opacity(0.12))
@@ -74,7 +95,6 @@ struct PersonImageView: View {
             RoundedRectangle(cornerRadius: width * 0.18, style: .continuous)
                 .stroke(.white.opacity(0.18), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.24), radius: 14, y: 8)
     }
 }
 

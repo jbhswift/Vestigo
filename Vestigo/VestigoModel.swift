@@ -138,7 +138,6 @@ final class VestigoModel: ObservableObject {
     // private var tasteDiveSimilarCache: [MediaKey: [MediaItem]] = [:]
     var tmdbExpandedSimilarCache: [MediaKey: [MediaItem]] = [:]
     var franchiseRecommendationCache: [MediaKey: [MediaItem]] = [:]
-    var pickForMeThematicCache: [String: [MediaItem]] = [:]
 
     // In-memory session state — survives tab switches but not app quit
     var pickForMeSessionAnswers: PickForMeAnswers? = nil

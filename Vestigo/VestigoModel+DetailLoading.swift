@@ -20,12 +20,24 @@ extension VestigoModel {
 
     func loadBasicDetailIfNeeded(_ item: MediaItem) async {
         guard detailsCache[item.key] == nil else { return }
-        do {
-            detailsCache[item.key] = try await tmdb.detail(for: item, regionCode: settings.streamingRegion.rawValue)
-        } catch { }
+        detailsCache[item.key] = await Self.fetchDetailWithFilteredTrailers(item, tmdb: tmdb, regionCode: settings.streamingRegion.rawValue)
     }
 
-    func filterShorts(from trailers: [TrailerVideo]) async -> [TrailerVideo] {
+    /// Fetches detail and strips Shorts from its trailers. Shared by every path that populates
+    /// `detailsCache` for the first time, so the filter can never be bypassed by a "warm" cache
+    /// write (e.g. content-cleanup filtering fetching basic detail before the detail view does).
+    static func fetchDetailWithFilteredTrailers(_ item: MediaItem, tmdb: TMDbService, regionCode: String) async -> MediaDetail? {
+        guard var detail = try? await tmdb.detail(for: item, regionCode: regionCode) else { return nil }
+        if !detail.trailers.isEmpty {
+            let filtered = await filterShorts(from: detail.trailers)
+            if filtered.count != detail.trailers.count {
+                detail = detail.withTrailers(filtered)
+            }
+        }
+        return detail
+    }
+
+    static func filterShorts(from trailers: [TrailerVideo]) async -> [TrailerVideo] {
         guard !trailers.isEmpty else { return trailers }
         let shortKeys = await withTaskGroup(of: String?.self, returning: Set<String>.self) { group in
             for trailer in trailers {
@@ -38,8 +50,17 @@ extension VestigoModel {
         return shortKeys.isEmpty ? trailers : trailers.filter { !shortKeys.contains($0.key) }
     }
 
+    /// Two independent signals, both rooted in how YouTube itself routes the video — never a
+    /// title/keyword guess. Falls closed (treats inconclusive as "is a Short") because a video
+    /// that can't be resolved by either signal is also one the embedded player likely can't load.
     static func isYouTubeShort(_ key: String) async -> Bool {
-        guard let url = URL(string: "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8") else { return false }
+        if let viaPlayerAPI = await isYouTubeShortViaPlayerAPI(key) { return viaPlayerAPI }
+        if let viaRedirect = await isYouTubeShortViaRedirect(key) { return viaRedirect }
+        return true
+    }
+
+    private static func isYouTubeShortViaPlayerAPI(_ key: String) async -> Bool? {
+        guard let url = URL(string: "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8") else { return nil }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -50,9 +71,9 @@ extension VestigoModel {
             "context": ["client": ["clientName": "ANDROID", "clientVersion": "17.31.35", "androidSdkVersion": 30]]
         ])
         guard let (data, _) = try? await URLSession.shared.data(for: request),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              { AnalyticsService.shared.track(.apiCallMade(service: "youtube")); return true }()
-        else { return false }
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        AnalyticsService.shared.track(.apiCallMade(service: "youtube"))
         // Canonical URL is definitive — YouTube sets /shorts/ for Shorts, /watch?v= for everything else
         if let microformat = json["microformat"] as? [String: Any],
            let renderer = microformat["playerMicroformatRenderer"] as? [String: Any],
@@ -68,20 +89,25 @@ extension VestigoModel {
                 return h > w
             }
         }
-        return false
+        return nil
+    }
+
+    /// Independent of the player API above: youtube.com itself redirects /shorts/{id} to
+    /// /watch?v={id} for any video that isn't actually a Short, and leaves the URL alone otherwise.
+    private static func isYouTubeShortViaRedirect(_ key: String) async -> Bool? {
+        guard let url = URL(string: "https://www.youtube.com/shorts/\(key)") else { return nil }
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        request.timeoutInterval = 5
+        guard let (_, response) = try? await URLSession.shared.data(for: request),
+              let finalURL = response.url
+        else { return nil }
+        return finalURL.path.hasPrefix("/shorts/")
     }
 
     func loadDetail(_ item: MediaItem) async {
         if detailsCache[item.key] == nil {
-            do {
-                detailsCache[item.key] = try await tmdb.detail(for: item, regionCode: settings.streamingRegion.rawValue)
-                if let detail = detailsCache[item.key], !detail.trailers.isEmpty {
-                    let filtered = await filterShorts(from: detail.trailers)
-                    if filtered.count != detail.trailers.count {
-                        detailsCache[item.key] = detail.withTrailers(filtered)
-                    }
-                }
-            } catch { }
+            detailsCache[item.key] = await Self.fetchDetailWithFilteredTrailers(item, tmdb: tmdb, regionCode: settings.streamingRegion.rawValue)
         }
         if item.kind == .movie, let detail = detailsCache[item.key], let collectionID = detail.tmdbCollectionID {
             do {
@@ -468,7 +494,6 @@ extension VestigoModel {
         tmdbExpandedSimilarCache = [:]
         franchiseRecommendationCache = [:]
         describeItResultsCache = [:]
-        pickForMeThematicCache = [:]
         clearHomeFeedCache()
     }
 

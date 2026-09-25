@@ -11,7 +11,6 @@ struct SettingsView: View {
     enum SettingsCategory: String, CaseIterable, Identifiable {
         case content
         case display
-        case notifications
         case data
         case about
         case dev
@@ -21,7 +20,6 @@ struct SettingsView: View {
             switch self {
             case .display: return "Display"
             case .content: return "Content"
-            case .notifications: return "Alerts"
             case .data: return "Data"
             case .about: return "About"
             case .dev: return "Dev"
@@ -57,7 +55,7 @@ struct SettingsView: View {
     }
 
     private var visibleCategories: [SettingsCategory] {
-        SettingsCategory.allCases.filter { $0 != .notifications && ($0 != .dev || devMode) }
+        SettingsCategory.allCases.filter { $0 != .dev || devMode }
     }
 
     private var settingsCategoryPills: some View {

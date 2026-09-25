@@ -53,6 +53,10 @@ struct RefreshImagesKey: EnvironmentKey {
     static let defaultValue = RefreshImagesAction {}
 }
 
+struct LowPowerModeActiveKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
     var imageRefreshToken: Int {
         get { self[ImageRefreshTokenKey.self] }
@@ -62,6 +66,14 @@ extension EnvironmentValues {
     var refreshImages: RefreshImagesAction {
         get { self[RefreshImagesKey.self] }
         set { self[RefreshImagesKey.self] = newValue }
+    }
+
+    /// Reflects `ProcessInfo.isLowPowerModeEnabled`, kept live by `LowPowerModeMonitor`.
+    /// Shared components read this to drop real-time blur/shadow effects that get
+    /// disproportionately expensive once the system throttles CPU/GPU clocks.
+    var isLowPowerModeActive: Bool {
+        get { self[LowPowerModeActiveKey.self] }
+        set { self[LowPowerModeActiveKey.self] = newValue }
     }
 }
 
@@ -101,23 +113,6 @@ extension View {
         }
     }
 }
-
-#if canImport(UIKit) && os(iOS)
-extension UIApplication {
-    func openNotificationSettings() {
-        let notificationSettingsURL: URL?
-        if #available(iOS 16.0, *) {
-            notificationSettingsURL = URL(string: UIApplication.openNotificationSettingsURLString)
-        } else {
-            notificationSettingsURL = nil
-        }
-
-        let fallbackURL = URL(string: UIApplication.openSettingsURLString)
-        guard let url = notificationSettingsURL ?? fallbackURL else { return }
-        open(url)
-    }
-}
-#endif
 
 struct FavouriteReplacementOverlay: View {
     let current: MediaItem

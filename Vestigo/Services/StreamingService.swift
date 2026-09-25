@@ -27,6 +27,7 @@ struct StreamingAvailabilityService {
         }
         let decoded = try JSONDecoder().decode(StreamingSourcesResponse.self, from: data)
         AnalyticsService.shared.track(.apiCallMade(service: decoded.source ?? "streaming"))
+        AnalyticsService.shared.track(.streamingChecked)
         return decoded.sources
     }
 }

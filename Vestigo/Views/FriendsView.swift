@@ -26,16 +26,10 @@ struct FriendProfile: Identifiable, Hashable, Codable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: FriendProfile, rhs: FriendProfile) -> Bool { lhs.id == rhs.id }
 
-    /// The item they most recently watched, using watchedDates to find the latest rather than
-    /// relying on array order (items without dates sort to the back during publish, so .first
-    /// can be an old dated item while a newer undated item sits at the end).
+    /// watchedItems already arrives ordered most-recent-first (CloudPublicSyncService sorts by
+    /// watch order, not watchedDates, since dates are opt-in and often missing).
     var mostRecentlyWatchedItem: MediaItem? {
-        guard !watchedItems.isEmpty else { return nil }
-        if let latestSID = watchedDates.max(by: { $0.value < $1.value })?.key,
-           let item = watchedItems.first(where: { $0.key.stableID == latestSID }) {
-            return item
-        }
-        return watchedItems.first
+        watchedItems.first
     }
 }
 
@@ -277,17 +271,25 @@ private struct QRCodeOverlay: View {
         }
         .onAppear {
             #if canImport(UIKit)
-            savedBrightness = UIScreen.main.brightness
-            UIScreen.main.brightness = 1.0
+            if let screen = currentScreen {
+                savedBrightness = screen.brightness
+                screen.brightness = 1.0
+            }
             #endif
             generateQR()
         }
         .onDisappear {
             #if canImport(UIKit)
-            UIScreen.main.brightness = savedBrightness
+            currentScreen?.brightness = savedBrightness
             #endif
         }
     }
+
+    #if canImport(UIKit)
+    private var currentScreen: UIScreen? {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.screen
+    }
+    #endif
 
     private func generateQR() {
         #if canImport(UIKit)

@@ -49,6 +49,7 @@ extension VestigoModel {
                         self.searchPeopleResults = people
                         self.searchResults = []
                         self.isSearchLoading = false
+                        AnalyticsService.shared.track(.searchPerformed(type: self.searchFilter.rawValue))
                     }
                 } else if let filter = self.searchFilter.mediaFilter {
                     let rankedVisibleResults = try await self.searchMediaResults(query: query, filter: filter)
@@ -65,6 +66,7 @@ extension VestigoModel {
                             requestID: requestID,
                             cacheKey: cacheKey
                         )
+                        AnalyticsService.shared.track(.searchPerformed(type: self.searchFilter.rawValue))
                     }
                 }
             } catch {

@@ -124,91 +124,6 @@ struct PickForMeAnswers: Hashable, Codable {
         secondaryArchetypes.contains(.smartProblems)
     }
 
-    var pickForMeThematicQuery: String? {
-        var terms: [String] = []
-        for archetype in archetypes where !archetype.isAnyOption {
-            if let t = archetype.cerebrasConceptTerm { terms.append(t) }
-        }
-        for archetype in secondaryArchetypes where !archetype.isAnyOption {
-            if let t = archetype.cerebrasConceptTerm { terms.append(t) }
-        }
-        for genre in genrePreferences where !genre.isAnyOption {
-            if let t = genre.cerebrasConceptTerm { terms.append(t) }
-        }
-        guard !terms.isEmpty else { return nil }
-        return terms.joined(separator: ", ")
-    }
-
-    var pickForMeGroqFullQuery: String? {
-        var lines: [String] = []
-
-        // genre_flavor goes first — anchors every suggestion around the required setting/genre
-        let genreTerms = genrePreferences.compactMap { pref -> String? in
-            guard !pref.isAnyOption else { return nil }
-            if let term = pref.cerebrasConceptTerm {
-                return "\(pref.title) (\(term))"
-            }
-            return pref.title
-        }
-        if !genreTerms.isEmpty {
-            lines.append("genre_flavor: \(genreTerms.joined(separator: "; "))")
-        }
-
-        let primaryTitles = archetypes.compactMap { $0.isAnyOption ? nil : $0.title }
-        if !primaryTitles.isEmpty {
-            lines.append("mood: \(primaryTitles.joined(separator: ", "))")
-        }
-
-        let secondaryTitles = secondaryArchetypes.compactMap { $0.isAnyOption ? nil : $0.title }
-        if !secondaryTitles.isEmpty {
-            lines.append("secondary: \(secondaryTitles.joined(separator: ", "))")
-        }
-
-        if let fp = fictionPreference, !fp.isAnyOption {
-            lines.append("fiction_preference: \(fp.title)")
-        }
-
-        if let r = releaseAge, !r.isAnyOption {
-            let currentYear = Calendar.current.component(.year, from: Date())
-            var releaseStr = r.title
-            if let maxYears = r.maximumYearsOld {
-                releaseStr += " — must be released in \(currentYear - maxYears) or later"
-            } else if let minYears = r.minimumYearsOld {
-                releaseStr += " — must be released before \(currentYear - minYears)"
-            }
-            lines.append("release_window: \(releaseStr)")
-        }
-
-        if let sm = sourceMaterial, !sm.isAnyOption {
-            lines.append("source: \(sm.title)")
-        }
-
-        var avoidList: [String] = []
-        for db in dealBreakers {
-            switch db {
-            case .horror: avoidList.append("horror")
-            case .romanceHeavy: avoidList.append("romance-heavy")
-            case .animation: avoidList.append("animated/anime")
-            case .documentary: avoidList.append("documentary")
-            case .war: avoidList.append("war films")
-            case .superhero: avoidList.append("superhero")
-            case .foreignLanguage: avoidList.append("non-English")
-            case .graphicViolence: avoidList.append("graphic violence")
-            case .sexualContent: avoidList.append("explicit sexual content")
-            case .verySad: avoidList.append("very sad or emotionally devastating")
-            case .sciFi: avoidList.append("science fiction or sci-fi")
-            case .heavyFantasy: avoidList.append("heavy fantasy, magic, or supernatural worlds")
-            case .none: break
-            }
-        }
-        if !avoidList.isEmpty {
-            lines.append("avoid: \(avoidList.joined(separator: ", "))")
-        }
-
-        guard !lines.isEmpty else { return nil }
-        return lines.joined(separator: "\n")
-    }
-
     var summaryTags: [String] {
         var tags: [String] = []
         if let format = mediaFormat { tags.append(format.title) }
@@ -455,26 +370,6 @@ enum PickForMeArchetype: String, CaseIterable, Codable, PickForMeOption {
         }
     }
 
-    var cerebrasConceptTerm: String? {
-        switch self {
-        case .feelGood: return "uplifting heartwarming optimistic"
-        case .mystery: return "mystery detective whodunit hidden secrets"
-        case .thriller: return "psychological thriller suspense tension"
-        case .smartProblems: return "intelligent problem-solving expert investigation"
-        case .mission: return "high-stakes mission operation survival"
-        case .heist: return "heist con caper elaborate scheme"
-        case .characterRelationships: return "character study relationship drama personal growth"
-        case .humanTriumph: return "underdog triumph resilience overcoming odds"
-        case .epicSpectacle: return "epic spectacle grand scale ambitious"
-        case .mindBending: return "mind-bending twist unreliable narrator complex narrative"
-        case .thoughtfulSciFi: return "thought-provoking sci-fi ethics technology consciousness"
-        case .comedy: return "comedy funny humorous light-hearted"
-        case .adventure: return "adventure exploration journey discovery"
-        case .war: return "war combat military conflict"
-        case .horror: return "horror frightening scary dread"
-        case .documentary, .historical, .surprise, .noPreference: return nil
-        }
-    }
 }
 
 enum PickForMeGenrePreference: String, CaseIterable, Codable, PickForMeOption {
@@ -499,23 +394,6 @@ enum PickForMeGenrePreference: String, CaseIterable, Codable, PickForMeOption {
     }
     var isAnyOption: Bool { self == .noPreference }
 
-    var cerebrasConceptTerm: String? {
-        switch self {
-        case .space: return "set in outer space — spacecraft, astronauts, alien worlds, space stations, interstellar travel"
-        case .fantasy: return "fantasy world — magic, mythical creatures, kingdoms, sorcery"
-        case .sciFi: return "science fiction — future technology, AI, alternate worlds, scientific concepts"
-        case .action: return "action-heavy — fights, chases, explosions, combat sequences"
-        case .history: return "historical setting — real past eras, period drama, historical figures"
-        case .crime: return "crime-focused — heists, gangs, detectives, criminal underworld"
-        case .romance: return "romance-centered — love stories, relationships, romantic tension"
-        case .horror: return "horror — scary, frightening, disturbing, dread"
-        case .comedy: return "comedy — funny, humorous, light-hearted, laugh-out-loud"
-        case .war: return "war — military combat, battlefield, wartime survival"
-        case .animation: return "animated — cartoon, anime, or animated feature"
-        case .family: return "family-friendly — suitable for all ages, wholesome"
-        case .noPreference: return nil
-        }
-    }
 }
 
 enum PickForMeFictionPreference: String, CaseIterable, Codable, PickForMeOption {

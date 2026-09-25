@@ -103,6 +103,7 @@ extension VestigoModel {
         }
         settings.socialConfirmedFriendIDs.append(recordID)
         saveSettings()
+        AnalyticsService.shared.track(.friendAdded)
         pendingFriendAdd = nil
         // Refresh list immediately; notify the other person in parallel
         Task { await loadFriends() }

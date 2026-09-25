@@ -1,5 +1,8 @@
 import SwiftUI
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 extension VestigoModel {
 
@@ -129,10 +132,25 @@ extension VestigoModel {
     func schedulePublicProfilePublish() {
         publishTask?.cancel()
         publishTask = Task { [weak self] in
+            // Watching/watchlisting something is often immediately followed by backgrounding
+            // the app. Without a task assertion, iOS can suspend the process mid-debounce or
+            // mid-upload, silently dropping the publish so lastActiveAt never reaches the server.
+            #if canImport(UIKit)
+            let bgTaskID = await MainActor.run { UIApplication.shared.beginBackgroundTask(withName: "PublishFriendProfile") }
+            defer {
+                Task { @MainActor in
+                    guard bgTaskID != .invalid else { return }
+                    UIApplication.shared.endBackgroundTask(bgTaskID)
+                }
+            }
+            #endif
             try? await Task.sleep(nanoseconds: 500_000_000)
             guard !Task.isCancelled, let self else { return }
             let result = await self.publicSync.publishProfile(settings: self.settings, library: self.library, avatarData: self.userAvatarData)
-            await MainActor.run { self.publishDiagnostic = result }
+            await MainActor.run {
+                self.publishDiagnostic = result
+                self.lastProfilePublish = Date()
+            }
         }
     }
 

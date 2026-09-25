@@ -58,6 +58,7 @@ struct TrailersSection: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear { AnalyticsService.shared.track(.trailerOpened) }
     }
 
     @ViewBuilder private func trailerNavButton(direction: Int, visible: Bool) -> some View {

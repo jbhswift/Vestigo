@@ -165,6 +165,7 @@ struct CinemasNearYouSection: View {
     private func kickOffLoadIfNeeded() {
         guard !didAttemptLoad else { return }
         didAttemptLoad = true
+        AnalyticsService.shared.track(.cinemaSearchUsed)
         Task { await service.loadNearbyTheaters(filmTitle: filmTitle) }
     }
 

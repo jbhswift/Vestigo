@@ -24,6 +24,7 @@ import WebKit
 
 struct ContentView: View {
     @StateObject private var model = VestigoModel()
+    @State private var lowPowerMode = LowPowerModeMonitor()
     @Namespace private var tabNamespace
     @Environment(\.scenePhase) private var scenePhase
 
@@ -91,10 +92,11 @@ struct ContentView: View {
         .environment(\.refreshImages, RefreshImagesAction {
             model.refreshImages()
         })
+        .environment(\.isLowPowerModeActive, lowPowerMode.isEnabled)
         .task { await model.bootstrap() }
         .onChange(of: model.settings.socialMyRecordName) { _, recordName in
             guard !recordName.isEmpty else { return }
-            AnalyticsService.shared.identify(cloudKitID: recordName, name: model.settings.name)
+            Task { await AnalyticsService.shared.identify(cloudKitID: recordName, name: model.settings.name) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .vestigoShortcut)) { notification in
             if let type = notification.object as? String {

@@ -36,7 +36,7 @@ private struct SwipeToDeleteModifier: ViewModifier {
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .contentShape(Rectangle())
-        .simultaneousGesture(
+        .highPriorityGesture(
             DragGesture(minimumDistance: 12)
                 .onChanged { value in
                     let dx = value.translation.width
@@ -87,11 +87,22 @@ extension View {
 
 struct LiquidGlassModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isLowPowerModeActive) private var isLowPowerModeActive
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        if #available(iOS 26.0, *) {
+        if isLowPowerModeActive {
+            // Low Power Mode throttles CPU/GPU clocks, so the real-time backdrop
+            // blur behind .glassEffect/.ultraThinMaterial (and its shadow) gets
+            // disproportionately expensive when this modifier is stamped out
+            // across dozens of tiles/rows in a scrolling list. Fall back to a
+            // flat tint that reads the same but costs one solid fill to render.
+            content
+                .background { shape.fill(colorScheme == .light ? .black.opacity(0.13) : .white.opacity(0.10)) }
+                .overlay { shape.stroke(colorScheme == .light ? .black.opacity(0.22) : .white.opacity(0.16), lineWidth: 1) }
+                .clipShape(shape)
+        } else if #available(iOS 26.0, *) {
             content
                 .padding(1)
                 .glassEffect(.regular, in: shape)

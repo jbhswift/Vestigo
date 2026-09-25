@@ -266,8 +266,8 @@ export async function GET(request: NextRequest) {
       distribution: distribution ? String(distribution) : null,
     }))
 
-    // OpenRouter calls: Describe It only — Pick For Me is a client-side archetypal system
-    const groqTotal = features.find((f) => f.event === 'describe_it_used')?.total ?? 0
+    // OpenRouter calls: Describe It only — Pick For Me is a client-side archetypal system (no Groq/DeepSeek call)
+    const openRouterTotal = features.find((f) => f.event === 'describe_it_used')?.total ?? 0
 
     // OMDb totals from external_rating_fetched events (app-wide, all key sources)
     const omdbTotal = omdbDaily.reduce((sum, d) => sum + d.count, 0)
@@ -319,9 +319,9 @@ export async function GET(request: NextRequest) {
           // User override key reports (only populated when a user has set their own key in dev settings)
           supabase: supabaseOmdb,
         },
-        groq: {
-          periodTotal: groqTotal,
-          note: 'Each Pick For Me run + Describe It use = 1 Groq call',
+        openrouter: {
+          periodTotal: openRouterTotal,
+          note: 'Each Describe It use = 1 OpenRouter call. Pick For Me runs client-side and makes no LLM call.',
         },
       },
     })

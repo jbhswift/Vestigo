@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		62EDA13A304DF1BB00E7DF22 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 62EDA139304DF1BB00E7DF22 /* Sentry */; };
+		62346F913066967E00ED8D44 /* SentrySPM in Frameworks */ = {isa = PBXBuildFile; productRef = 62346F903066967E00ED8D44 /* SentrySPM */; };
 		62EDA13D304DF2AE00E7DF22 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = 62EDA13C304DF2AE00E7DF22 /* PostHog */; };
 		62FE636A3066125200553ACA /* SVGView in Frameworks */ = {isa = PBXBuildFile; productRef = 62FE63693066125200553ACA /* SVGView */; };
 /* End PBXBuildFile section */
@@ -72,7 +72,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				62FE636A3066125200553ACA /* SVGView in Frameworks */,
-				62EDA13A304DF1BB00E7DF22 /* Sentry in Frameworks */,
+				62346F913066967E00ED8D44 /* SentrySPM in Frameworks */,
 				62EDA13D304DF2AE00E7DF22 /* PostHog in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -142,9 +142,9 @@
 			);
 			name = Vestigo;
 			packageProductDependencies = (
-				62EDA139304DF1BB00E7DF22 /* Sentry */,
 				62EDA13C304DF2AE00E7DF22 /* PostHog */,
 				62FE63693066125200553ACA /* SVGView */,
+				62346F903066967E00ED8D44 /* SentrySPM */,
 			);
 			productName = Vestigo;
 			productReference = 620094C42FB15C85000C2463 /* Vestigo.app */;
@@ -665,10 +665,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		62EDA139304DF1BB00E7DF22 /* Sentry */ = {
+		62346F903066967E00ED8D44 /* SentrySPM */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 62EDA138304DF1BB00E7DF22 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
-			productName = Sentry;
+			productName = SentrySPM;
 		};
 		62EDA13C304DF2AE00E7DF22 /* PostHog */ = {
 			isa = XCSwiftPackageProductDependency;

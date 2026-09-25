@@ -69,8 +69,13 @@ struct CloudPublicSyncService {
                 record["watchlistPayload"] = nil as CKAsset?
             }
             if sharing && settings.socialShareWatched {
+                // watchedOrder (appended unconditionally on every watch) reflects true recency.
+                // watchedDates is opt-in (autoTrackWatchDate) and often empty, which previously left
+                // undated items tied at .distantPast and sorted by Set iteration order — effectively
+                // random, so a friend's just-watched item could be buried behind older watches.
+                let watchOrderIndex = Dictionary(uniqueKeysWithValues: library.watchedOrder.enumerated().map { ($1, $0) })
                 let sortedWatched = library.watchedItems.sorted {
-                    (library.watchedDates[$0.key] ?? .distantPast) > (library.watchedDates[$1.key] ?? .distantPast)
+                    (watchOrderIndex[$0.key] ?? -1) > (watchOrderIndex[$1.key] ?? -1)
                 }
                 if let data = try? JSONEncoder().encode(sortedWatched) {
                     record["watchedPayload"] = CKAsset(fileURL: try writeTemp(data, name: "watched"))

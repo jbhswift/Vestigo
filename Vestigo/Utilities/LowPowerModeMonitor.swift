@@ -1,8 +1,10 @@
 import Foundation
+import Observation
 
 @MainActor
-final class LowPowerModeMonitor: ObservableObject {
-    @Published private(set) var isEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
+@Observable
+final class LowPowerModeMonitor {
+    private(set) var isEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
 
     init() {
         Task { [weak self] in

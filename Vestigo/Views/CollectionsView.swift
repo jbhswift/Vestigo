@@ -6,9 +6,6 @@ import UIKit
 #if canImport(WebKit)
 import WebKit
 #endif
-#if canImport(UserNotifications)
-import UserNotifications
-#endif
 
 // MARK: - Collections
 // Franchises use a dedicated pushed screen from Collections.

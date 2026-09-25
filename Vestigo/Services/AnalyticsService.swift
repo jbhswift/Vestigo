@@ -1,6 +1,7 @@
 import Foundation
 import PostHog
-import Sentry
+import SentrySwift
+import StoreKit
 
 // MARK: - Events
 
@@ -11,7 +12,6 @@ enum AnalyticsEvent {
     case describeItUsed
     case cinemaSearchUsed
     case searchPerformed(type: String)
-    case itemDetailViewed(mediaType: String)
     case itemAdded(mediaType: String, action: String)
     case itemRated(rating: Double)
     case friendAdded
@@ -38,8 +38,6 @@ private extension AnalyticsEvent {
             return ("cinema_search_used", nil)
         case .searchPerformed(let type):
             return ("search_performed", ["search_type": type])
-        case .itemDetailViewed(let type):
-            return ("item_detail_viewed", ["media_type": type])
         case .itemAdded(let type, let action):
             return ("item_added", ["media_type": type, "action": action])
         case .itemRated(let rating):
@@ -69,6 +67,8 @@ private struct AppRemoteConfig: Decodable {
     let posthogKey: String
     let posthogHost: String
     let sentryDsn: String
+    let sentryAppHangTimeoutSeconds: TimeInterval?
+    let sentryReportNonFullyBlockingAppHangs: Bool?
 }
 
 // MARK: - Service
@@ -82,10 +82,6 @@ final class AnalyticsService: @unchecked Sendable {
     private var isReady = false
     private var pendingEvents: [(name: String, props: [String: Any]?)] = []
 
-    private var isTestFlight: Bool {
-        Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
-    }
-
     private var isSimulator: Bool {
         #if targetEnvironment(simulator)
         return true
@@ -94,12 +90,25 @@ final class AnalyticsService: @unchecked Sendable {
         #endif
     }
 
-    private var distribution: String {
+    private var cachedDistribution: String?
+
+    private func resolveDistribution() async -> String {
         #if DEBUG
         return "development"
         #else
-        return isTestFlight ? "testflight" : "appstore"
+        if let cachedDistribution { return cachedDistribution }
+        let resolved = await isSandboxEnvironment() ? "testflight" : "appstore"
+        cachedDistribution = resolved
+        return resolved
         #endif
+    }
+
+    private func isSandboxEnvironment() async -> Bool {
+        guard let result = try? await AppTransaction.shared else { return false }
+        switch result {
+        case .verified(let transaction), .unverified(let transaction, _):
+            return transaction.environment == .sandbox
+        }
     }
 
     func setup() {
@@ -133,8 +142,9 @@ final class AnalyticsService: @unchecked Sendable {
             }
 
             print("[Analytics] Config loaded. Setting up PostHog + Sentry.")
-            setupPostHog(key: config.posthogKey, host: config.posthogHost)
-            setupSentry(dsn: config.sentryDsn)
+            let distribution = await resolveDistribution()
+            setupPostHog(key: config.posthogKey, host: config.posthogHost, distribution: distribution)
+            setupSentry(config: config, distribution: distribution)
             flushPendingEvents()
 
         } catch {
@@ -142,8 +152,8 @@ final class AnalyticsService: @unchecked Sendable {
         }
     }
 
-    private func setupPostHog(key: String, host: String) {
-        let config = PostHogConfig(apiKey: key, host: host)
+    private func setupPostHog(key: String, host: String, distribution: String) {
+        let config = PostHogConfig(projectToken: key, host: host)
         config.captureApplicationLifecycleEvents = true
         config.captureScreenViews = false
         PostHogSDK.shared.setup(config)
@@ -154,19 +164,25 @@ final class AnalyticsService: @unchecked Sendable {
         print("[Analytics] PostHog ready ✓")
     }
 
-    private func setupSentry(dsn: String) {
-        guard !dsn.isEmpty else { return }
+    private func setupSentry(config: AppRemoteConfig, distribution: String) {
+        guard !config.sentryDsn.isEmpty else { return }
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
         let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
         SentrySDK.start { options in
-            options.dsn = dsn
+            options.dsn = config.sentryDsn
             options.tracesSampleRate = 0.1
-            options.environment = self.distribution
+            options.environment = distribution
             options.releaseName = "vestigo@\(appVersion)+\(buildNumber)"
             options.attachViewHierarchy = false
+            if let appHangTimeout = config.sentryAppHangTimeoutSeconds, appHangTimeout > 0 {
+                options.appHangTimeoutInterval = appHangTimeout
+            }
+            if let reportNonFullyBlocking = config.sentryReportNonFullyBlockingAppHangs {
+                options.enableReportNonFullyBlockingAppHangs = reportNonFullyBlocking
+            }
         }
         SentrySDK.configureScope { scope in
-            scope.setTag(value: self.distribution, key: "distribution")
+            scope.setTag(value: distribution, key: "distribution")
             scope.setTag(value: appVersion, key: "app_version")
         }
         print("[Analytics] Sentry ready ✓")
@@ -185,8 +201,9 @@ final class AnalyticsService: @unchecked Sendable {
         }
     }
 
-    func identify(cloudKitID: String, name: String) {
+    func identify(cloudKitID: String, name: String) async {
         guard !cloudKitID.isEmpty else { return }
+        let distribution = await resolveDistribution()
         PostHogSDK.shared.identify(cloudKitID, userProperties: [
             "name": name.isEmpty ? "Unknown" : name,
             "distribution": distribution,
@@ -205,18 +222,6 @@ final class AnalyticsService: @unchecked Sendable {
         } else {
             pendingEvents.append((name: name, props: props))
             lock.unlock()
-        }
-    }
-
-    func captureError(_ error: Error, context: [String: Any] = [:]) {
-        SentrySDK.capture(error: error) { scope in
-            for (key, value) in context { scope.setExtra(value: value, key: key) }
-        }
-    }
-
-    func captureMessage(_ message: String, context: [String: Any] = [:]) {
-        SentrySDK.capture(message: message) { scope in
-            for (key, value) in context { scope.setExtra(value: value, key: key) }
         }
     }
 }

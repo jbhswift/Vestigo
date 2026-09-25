@@ -15,7 +15,7 @@ struct ThematicSearchResult: Identifiable, Codable {
 struct ThematicSearchService {
     let tmdb: TMDbService
 
-    static var isAvailable: Bool { true }
+    static var isAvailable: Bool { false }
     static let dailyLimit = 14_400
 
     func search(rawQuery: String, filter: MediaFilter) async throws -> [ThematicSearchResult] {
