@@ -126,17 +126,6 @@ private struct DevToolsPanel: View {
             }
             .settingBubble()
 
-            // MARK: Features
-            devSectionLabel("Features")
-
-            Toggle("Show cinema showtimes (beta)", isOn: Binding(
-                get: { UserDefaults.standard.bool(forKey: "Vestigo.showCinemas") },
-                set: { UserDefaults.standard.set($0, forKey: "Vestigo.showCinemas") }
-            ))
-            .font(.headline.bold())
-            .tint(model.settings.accentColor)
-            .settingBubble()
-
             // MARK: OMDb Override Key
             devSectionLabel("OMDb Override Key")
 

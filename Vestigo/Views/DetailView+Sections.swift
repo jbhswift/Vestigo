@@ -458,7 +458,7 @@ extension DetailView {
 
     @ViewBuilder var cinemasSection: some View {
         #if canImport(CoreLocation)
-        if item.kind == .movie && UserDefaults.standard.bool(forKey: "Vestigo.showCinemas") {
+        if item.kind == .movie {
             CinemasNearYouSection(
                 filmTitle: item.title,
                 releaseDate: item.releaseDateValue,

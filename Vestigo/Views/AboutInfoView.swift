@@ -124,14 +124,10 @@ struct AboutLinkButton: View {
 }
 
 struct AttributionFooter: View {
-    @AppStorage("Vestigo.showCinemas") private var showCinemas = false
-
     private var providers: [AttributionProvider] {
         var list = AttributionProvider.all
-        if showCinemas {
-            let wikimediaIndex = list.firstIndex(where: { $0.id == "wikimedia" }) ?? list.endIndex
-            list.insert(AttributionProvider.amc, at: wikimediaIndex)
-        }
+        let wikimediaIndex = list.firstIndex(where: { $0.id == "wikimedia" }) ?? list.endIndex
+        list.insert(AttributionProvider.amc, at: wikimediaIndex)
         return list
     }
 
