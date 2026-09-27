@@ -501,8 +501,16 @@ extension VestigoModel {
 
             let preparedItems = preparedResults(items, hideWatched: settings.hideWatchedFromSearch)
             let visibleItems = await filteredContentCleanupIfNeeded(preparedItems, hideShortFilms: settings.hideShortFilmsFromSearch, hideExtrasAndPromos: settings.hideExtrasAndPromosFromSearch)
-            let fastSortedItems = sort == .tmdbRating
-                ? visibleItems.sorted { lhs, rhs in
+            func sortedByReleaseDate(_ items: [MediaItem]) -> [MediaItem] {
+                items.sorted { lhs, rhs in
+                    (lhs.releaseDateValue ?? .distantPast) > (rhs.releaseDateValue ?? .distantPast)
+                }
+            }
+
+            let fastSortedItems: [MediaItem]
+            switch sort {
+            case .tmdbRating:
+                fastSortedItems = visibleItems.sorted { lhs, rhs in
                     let lhsRating = lhs.voteAverage
                     let rhsRating = rhs.voteAverage
                     if lhsRating != rhsRating {
@@ -511,7 +519,9 @@ extension VestigoModel {
 
                     return (lhs.releaseDateValue ?? .distantPast) > (rhs.releaseDateValue ?? .distantPast)
                 }
-                : visibleItems
+            case .releaseDate:
+                fastSortedItems = sortedByReleaseDate(visibleItems)
+            }
 
             await MainActor.run {
                 genreResults[cacheKey] = fastSortedItems
@@ -519,8 +529,10 @@ extension VestigoModel {
 
             await loadExternalRatings(for: Array(visibleItems.prefix(12)), limit: 12)
 
-            let finalSortedItems = sort == .tmdbRating
-                ? visibleItems.sorted { lhs, rhs in
+            let finalSortedItems: [MediaItem]
+            switch sort {
+            case .tmdbRating:
+                finalSortedItems = visibleItems.sorted { lhs, rhs in
                     let lhsRating = ratingSortValue(for: lhs)
                     let rhsRating = ratingSortValue(for: rhs)
                     if lhsRating != rhsRating {
@@ -529,7 +541,9 @@ extension VestigoModel {
 
                     return (lhs.releaseDateValue ?? .distantPast) > (rhs.releaseDateValue ?? .distantPast)
                 }
-                : visibleItems
+            case .releaseDate:
+                finalSortedItems = fastSortedItems
+            }
 
             await MainActor.run {
                 genreResults[cacheKey] = finalSortedItems

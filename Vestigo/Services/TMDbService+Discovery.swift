@@ -11,7 +11,7 @@ extension TMDbService {
             return try await discoverKeywordCategory(keywordIDs: keywordIDs, filter: filter, sort: sort)
         }
 
-        async let discoveredItems = discoverCategoryItems(genreID: genreID, filter: filter)
+        async let discoveredItems = discoverCategoryItems(genreID: genreID, filter: filter, sort: sort)
         async let curatedItems = curatedCategoryItems(genreID: genreID, filter: filter)
 
         return try await (discoveredItems + curatedItems)
@@ -119,18 +119,18 @@ extension TMDbService {
 
     // MARK: - Private discovery helpers
 
-    private func discoverCategoryItems(genreID: Int, filter: MediaFilter) async throws -> [MediaItem] {
+    private func discoverCategoryItems(genreID: Int, filter: MediaFilter, sort: GenreSort) async throws -> [MediaItem] {
         switch filter {
         case .both:
-            async let movies = discoverCategorySingleMedia(genreID: genreID, media: "movie")
-            async let series = discoverCategorySingleMedia(genreID: genreID, media: "tv")
+            async let movies = discoverCategorySingleMedia(genreID: genreID, media: "movie", sort: sort)
+            async let series = discoverCategorySingleMedia(genreID: genreID, media: "tv", sort: sort)
             return try await (movies + series)
                 .uniqued()
                 .prefixArray(50)
         case .movie:
-            return try await discoverCategorySingleMedia(genreID: genreID, media: "movie")
+            return try await discoverCategorySingleMedia(genreID: genreID, media: "movie", sort: sort)
         case .tv:
-            return try await discoverCategorySingleMedia(genreID: genreID, media: "tv")
+            return try await discoverCategorySingleMedia(genreID: genreID, media: "tv", sort: sort)
         }
     }
 
@@ -497,7 +497,7 @@ extension TMDbService {
         return try await fetchListPages(path: "/discover/\(media)", query: query, pages: 5)
     }
 
-    private func discoverCategorySingleMedia(genreID: Int, media: String) async throws -> [MediaItem] {
+    private func discoverCategorySingleMedia(genreID: Int, media: String, sort: GenreSort) async throws -> [MediaItem] {
         let tmdbGenreIDs = tmdbGenreIDsToQuery(for: genreID, media: media)
         guard !tmdbGenreIDs.isEmpty else { return [] }
 
@@ -507,7 +507,7 @@ extension TMDbService {
 
         let query: [URLQueryItem] = [
             URLQueryItem(name: "with_genres", value: queryGenreString),
-            URLQueryItem(name: "sort_by", value: "popularity.desc"),
+            URLQueryItem(name: "sort_by", value: sort.tmdbSort),
             URLQueryItem(name: "with_original_language", value: "en"),
             URLQueryItem(name: "vote_count.gte", value: minVoteCount),
             URLQueryItem(name: "vote_average.gte", value: minVoteAverage),
