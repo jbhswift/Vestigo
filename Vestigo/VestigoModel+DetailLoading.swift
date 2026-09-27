@@ -175,19 +175,21 @@ extension VestigoModel {
         if providerCache[item.key] == nil {
             do {
                 let pricedProviders = try await streaming.providers(for: item, imdbID: detailsCache[item.key]?.imdbID, regionCode: settings.streamingRegion.rawValue)
-                if pricedProviders.isEmpty, let tmdbProviders = detailsCache[item.key]?.tmdbProviders, !tmdbProviders.isEmpty {
-                    providerCache[item.key] = tmdbProviders
+                let tmdbProviders = detailsCache[item.key]?.tmdbProviders ?? []
+                let mergedProviders = StreamingOption.mergedForProviderDisplay(primary: pricedProviders, tmdb: tmdbProviders)
+                if pricedProviders.isEmpty, !tmdbProviders.isEmpty {
+                    providerCache[item.key] = mergedProviders
                     tmdbFallbackKeys.insert(item.key)
-                    scheduleWatchmodeRetryIfNeeded(item)
+                    scheduleStreamingRetryIfNeeded(item)
                 } else {
-                    providerCache[item.key] = pricedProviders
+                    providerCache[item.key] = mergedProviders
                 }
             } catch {
-                let fallback = detailsCache[item.key]?.tmdbProviders ?? []
+                let fallback = StreamingOption.mergedForProviderDisplay(primary: [], tmdb: detailsCache[item.key]?.tmdbProviders ?? [])
                 providerCache[item.key] = fallback
                 if !fallback.isEmpty {
                     tmdbFallbackKeys.insert(item.key)
-                    scheduleWatchmodeRetryIfNeeded(item)
+                    scheduleStreamingRetryIfNeeded(item)
                 }
             }
         }
@@ -204,14 +206,15 @@ extension VestigoModel {
         }
     }
 
-    func scheduleWatchmodeRetryIfNeeded(_ item: MediaItem) {
-        guard !watchmodeBackgroundRetried.contains(item.key) else { return }
-        watchmodeBackgroundRetried.insert(item.key)
+    func scheduleStreamingRetryIfNeeded(_ item: MediaItem) {
+        guard !streamingBackgroundRetried.contains(item.key) else { return }
+        streamingBackgroundRetried.insert(item.key)
         Task {
             do {
                 let pricedProviders = try await streaming.providers(for: item, imdbID: detailsCache[item.key]?.imdbID, regionCode: settings.streamingRegion.rawValue)
                 if !pricedProviders.isEmpty {
-                    providerCache[item.key] = pricedProviders
+                    let tmdbProviders = detailsCache[item.key]?.tmdbProviders ?? []
+                    providerCache[item.key] = StreamingOption.mergedForProviderDisplay(primary: pricedProviders, tmdb: tmdbProviders)
                     tmdbFallbackKeys.remove(item.key)
                 }
             } catch { }
@@ -227,11 +230,13 @@ extension VestigoModel {
                 do {
                     let providers = try await streaming.providers(for: item, imdbID: detailsCache[item.key]?.imdbID, regionCode: settings.streamingRegion.rawValue)
                     await MainActor.run {
-                        if providers.isEmpty, let tmdb = detailsCache[item.key]?.tmdbProviders, !tmdb.isEmpty {
-                            providerCache[item.key] = tmdb
+                        let tmdb = detailsCache[item.key]?.tmdbProviders ?? []
+                        let mergedProviders = StreamingOption.mergedForProviderDisplay(primary: providers, tmdb: tmdb)
+                        if providers.isEmpty, !tmdb.isEmpty {
+                            providerCache[item.key] = mergedProviders
                             tmdbFallbackKeys.insert(item.key)
                         } else {
-                            providerCache[item.key] = providers
+                            providerCache[item.key] = mergedProviders
                         }
                     }
                 } catch {
@@ -520,6 +525,8 @@ extension VestigoModel {
     }
 
     func simulateFirstLaunch() {
+        UserDefaults.standard.set(false, forKey: "Vestigo.hasSeenTour")
+        showTour = true
         showStreamingSetup = true
     }
 

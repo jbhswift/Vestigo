@@ -121,21 +121,24 @@ struct StreamingServicePickerItem: Identifiable {
 
     static func mergedCatalog(
         regionServiceCatalog: [RegionStreamingService],
+        allRegionServiceCatalog: [RegionStreamingService],
         tmdbRegionProviders: [TMDbWatchProviderLogoDTO],
         tmdbGlobalProviders: [TMDbWatchProviderLogoDTO],
         includeUnavailable: Bool
     ) -> [StreamingServicePickerItem] {
         let availableProviderIDs = Set(tmdbRegionProviders.map(\.providerID))
+        let logoProviders = mergedProviders(tmdbRegionProviders, tmdbGlobalProviders)
         let tmdbSource = includeUnavailable ? mergedProviders(tmdbRegionProviders, tmdbGlobalProviders) : tmdbRegionProviders
         var items = tmdbSource.filter { !StreamingProviderNameNormalizer.isAddOnVariant($0.providerName) }.map { provider in
             item(provider: provider, regionServiceCatalog: regionServiceCatalog, isAvailable: availableProviderIDs.contains(provider.providerID))
         }
 
-        let motnOnlyItems = regionServiceCatalog
+        let motnSource = includeUnavailable ? allRegionServiceCatalog : regionServiceCatalog
+        let motnOnlyItems = motnSource
             .filter { regionService in
                 !items.contains { namesMatch($0.displayName, regionService.name) }
             }
-            .map { regionService in item(regionService: regionService) }
+            .map { regionService in item(regionService: regionService, tmdbProviders: logoProviders) }
 
         items.append(contentsOf: motnOnlyItems)
         return dedupedAndSorted(items)
@@ -164,9 +167,11 @@ struct StreamingServicePickerItem: Identifiable {
         )
     }
 
-    private static func item(regionService: RegionStreamingService) -> StreamingServicePickerItem {
+    private static func item(regionService: RegionStreamingService, tmdbProviders: [TMDbWatchProviderLogoDTO]) -> StreamingServicePickerItem {
         let knownService = KnownStreamingService.catalog.first { exactKnownServiceMatch($0, regionService.name) }
         let displayName = knownService?.displayName ?? regionService.name
+        let tmdbMatch = matchingTMDbProvider(for: regionService, knownService: knownService, in: tmdbProviders)
+        let tmdbLogoURL = tmdbMatch?.logoURL
         return StreamingServicePickerItem(
             id: knownService?.id ?? regionService.id,
             selectionIDSet: [knownService?.id ?? regionService.id],
@@ -176,8 +181,8 @@ struct StreamingServicePickerItem: Identifiable {
             iconLabel: knownService?.iconLabel ?? initials(for: displayName),
             brandColorHex: regionService.themeColorHex ?? knownService?.brandColorHex ?? "#3A3A3C",
             lightText: knownService?.lightText ?? true,
-            logoURL: regionService.logoURL.flatMap { URL(string: $0) },
-            logoDisplayMode: .fit,
+            logoURL: tmdbLogoURL ?? regionService.logoURL.flatMap { URL(string: $0) },
+            logoDisplayMode: tmdbLogoURL == nil ? .fit : .fill,
             isAvailable: true
         )
     }
@@ -230,6 +235,29 @@ struct StreamingServicePickerItem: Identifiable {
         StreamingProviderNameNormalizer.normalizedName(lhs) == StreamingProviderNameNormalizer.normalizedName(rhs)
     }
 
+    private static func matchingTMDbProvider(
+        for regionService: RegionStreamingService,
+        knownService: KnownStreamingService?,
+        in providers: [TMDbWatchProviderLogoDTO]
+    ) -> TMDbWatchProviderLogoDTO? {
+        if let tmdbProviderID = knownService?.tmdbProviderID,
+           let idMatch = providers.first(where: { $0.providerID == tmdbProviderID }) {
+            return idMatch
+        }
+
+        let serviceName = StreamingProviderNameNormalizer.normalizedName(regionService.name)
+        return providers.first { provider in
+            let providerName = StreamingProviderNameNormalizer.normalizedName(provider.providerName)
+            return providerName == serviceName
+        } ?? providers.first { provider in
+            let providerName = StreamingProviderNameNormalizer.dedupName(provider.providerName)
+            let serviceName = StreamingProviderNameNormalizer.dedupName(regionService.name)
+            return providerName == serviceName
+        } ?? providers.first { provider in
+            namesMatch(provider.providerName, regionService.name)
+        }
+    }
+
     private static func namesMatch(_ lhs: String, _ rhs: String) -> Bool {
         let left = StreamingProviderNameNormalizer.normalizedName(lhs)
         let right = StreamingProviderNameNormalizer.normalizedName(rhs)
@@ -259,6 +287,7 @@ struct StreamingServicesPicker: View {
     private var mergedCatalog: [StreamingServicePickerItem] {
         StreamingServicePickerItem.mergedCatalog(
             regionServiceCatalog: model.regionServiceCatalog,
+            allRegionServiceCatalog: model.allRegionServiceCatalog,
             tmdbRegionProviders: model.tmdbRegionProviders,
             tmdbGlobalProviders: model.tmdbGlobalProviders,
             includeUnavailable: showsUnavailableProviders
@@ -309,7 +338,9 @@ struct StreamingServicesPicker: View {
         }
         .task(id: showsUnavailableProviders) {
             guard showsUnavailableProviders else { return }
-            await model.loadTMDbGlobalProviders()
+            async let tmdbGlobal: Void = model.loadTMDbGlobalProviders()
+            async let motnGlobal: Void = model.loadAllRegionServiceCatalogs()
+            _ = await (tmdbGlobal, motnGlobal)
         }
     }
 

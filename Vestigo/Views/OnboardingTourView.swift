@@ -8,11 +8,25 @@ import UIKit
 struct TourStep {
     let id: Int
     let icon: String
-    // Add a same-named image asset to the asset catalog to replace the icon fallback.
-    // Expected names: tour_detail, tour_longpress, tour_search, tour_pickforme, tour_settings
+    // Assets: tour_detail, tour_longpress, tour_search_charts, tour_pickforme, tour_settings
     let imageName: String?
+    // When set, imageName and imageName2 are stacked vertically (top then bottom).
+    let imageName2: String?
+    // Custom-cropped composites (not full-device screenshots) size at their own natural
+    // aspect ratio instead of the device screenshot ratio.
+    let isCustomComposite: Bool
     let title: String
     let body: String
+
+    init(id: Int, icon: String, imageName: String?, imageName2: String? = nil, isCustomComposite: Bool = false, title: String, body: String) {
+        self.id = id
+        self.icon = icon
+        self.imageName = imageName
+        self.imageName2 = imageName2
+        self.isCustomComposite = isCustomComposite
+        self.title = title
+        self.body = body
+    }
 }
 
 extension TourStep {
@@ -22,42 +36,43 @@ extension TourStep {
             icon: "popcorn.fill",
             imageName: nil,
             title: "Welcome to Vestigo",
-            body: "Your complete guide to movies and TV. Track what you've watched, discover what's next, and share your taste with friends."
+            body: "Track and find your favourite movies and TV shows. The app uses your data to give you the best results."
         ),
         TourStep(
             id: 1,
             icon: "info.circle.fill",
             imageName: "tour_detail",
             title: "Tap any title for the full picture",
-            body: "Streaming availability, cast, ratings, trailers, related titles, and more. Mark it watched and rate it right from here."
+            body: "From an item's detail view, you can see more information about an item and mark it watched, save it, rate it, and more. You can also see where it is streaming and even where you can see it in cinemas nearby."
         ),
         TourStep(
             id: 2,
             icon: "hand.tap.fill",
             imageName: "tour_longpress",
             title: "Long-press for quick actions",
-            body: "Long-press any poster to instantly save it, mark a favourite, or tell Vestigo you're not interested — it learns from every signal."
+            body: "Long-press any poster to bring up a quick actions menu where you can also mark items as not interested or even to never show again. If you ever change your mind, you can find your banlist in data settings."
         ),
         TourStep(
             id: 3,
             icon: "magnifyingglass",
-            imageName: "tour_search",
+            imageName: "tour_search_charts",
+            isCustomComposite: true,
             title: "Search tab",
-            body: "Browse genres, explore all-time charts, or tap \"Don't know the name?\" to describe what you're thinking of and Vestigo will find it."
+            body: "Browse genres and explore all-time charts for movies and series to help you find what you're looking for."
         ),
         TourStep(
             id: 4,
             icon: "sparkles",
             imageName: "tour_pickforme",
             title: "Pick For Me",
-            body: "Tap Pick For Me on the Home tab for AI-powered recommendations tailored to your mood and your streaming services."
+            body: "Use Pick For Me in the Home tab to get recommendations based on a set of questions. You can filter by mood, rating, streaming services, and more."
         ),
         TourStep(
             id: 5,
             icon: "gearshape.fill",
             imageName: "tour_settings",
-            title: "Settings make it yours",
-            body: "Tap the gear icon on Home to set up streaming services, tune content filters, and customise your home carousels. The more you configure, the smarter Vestigo gets."
+            title: "Adjusting settings",
+            body: "Tap the gear icon in the top right of the Home tab to configure streaming services, tune content filters, and customise carousels."
         )
     ]
 }
@@ -72,34 +87,13 @@ struct OnboardingTourView: View {
     private var isLastStep: Bool { currentStep == steps.count - 1 }
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            TabView(selection: $currentStep) {
-                ForEach(steps, id: \.id) { step in
-                    TourStepPageView(step: step)
-                        .tag(step.id)
-                }
+        TabView(selection: $currentStep) {
+            ForEach(steps, id: \.id) { step in
+                TourStepPageView(step: step)
+                    .tag(step.id)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-
-            // Skip button — liquidGlass pill, hidden on welcome step
-            Button {
-                dismiss()
-            } label: {
-                Text("Skip")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 14)
-                    .frame(height: 34)
-                    .contentShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-                    .liquidGlass(cornerRadius: 17)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 16)
-            .padding(.trailing, 18)
-            .opacity(currentStep > 0 ? 1 : 0)
-            .allowsHitTesting(currentStep > 0)
-            .animation(.easeInOut(duration: 0.2), value: currentStep)
         }
+        .tabViewStyle(.page(indexDisplayMode: .never))
         .safeAreaInset(edge: .top, spacing: 0) {
             Capsule()
                 .fill(.white.opacity(0.46))
@@ -160,11 +154,10 @@ struct OnboardingTourView: View {
                     } label: {
                         Text("Get Started")
                             .font(.headline.bold())
-                            .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
-                            .background(Color.blue, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
                             .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                            .liquidGlass(cornerRadius: 26)
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -199,45 +192,74 @@ private struct TourStepPageView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 24)
-
             stepHero
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
+            textBlock
                 .padding(.horizontal, 24)
+                .padding(.top, 18)
+                .padding(.bottom, 10)
+        }
+    }
 
-            Spacer(minLength: 24)
+    private var textBlock: some View {
+        VStack(spacing: 8) {
+            Text(step.title)
+                .font(.title3.bold())
+                .multilineTextAlignment(.center)
 
-            VStack(spacing: 12) {
-                Text(step.title)
-                    .font(.title2.bold())
-                    .multilineTextAlignment(.center)
+            Text(step.body)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
-                Text(step.body)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, 28)
+    // iPhone 16e screenshot pixel dimensions (1170 x 2532) — used to size the rounded
+    // box so it hugs the actual fitted image instead of the raw GeometryReader rect,
+    // which can be letterboxed if its aspect ratio doesn't match the screenshot's.
+    private let deviceAspectRatio: CGFloat = 1170.0 / 2532.0
 
-            Spacer()
+    private func fittedSize(in available: CGSize) -> CGSize {
+        let widthFromHeight = available.height * deviceAspectRatio
+        if widthFromHeight <= available.width {
+            return CGSize(width: widthFromHeight, height: available.height)
+        } else {
+            return CGSize(width: available.width, height: available.width / deviceAspectRatio)
         }
     }
 
     @ViewBuilder
     private var stepHero: some View {
-        if let imageName = step.imageName, assetExists(imageName) {
-            Image(imageName)
-                .resizable()
-                .scaledToFit()
-                .frame(maxHeight: 320)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .shadow(color: .black.opacity(0.12), radius: 20, x: 0, y: 8)
+        if step.isCustomComposite, let top = step.imageName, assetExists(top) {
+            // Custom-cropped composites (not full-device screenshots) — use their own
+            // natural aspect ratio at full width rather than the device ratio.
+            VStack(spacing: 10) {
+                tourImageNatural(top)
+                if let bottom = step.imageName2, assetExists(bottom) {
+                    tourImageNatural(bottom)
+                }
+            }
+        } else if let imageName = step.imageName, assetExists(imageName) {
+            GeometryReader { geo in
+                tourImage(imageName, size: fittedSize(in: geo.size))
+                    .frame(width: geo.size.width, height: geo.size.height)
+            }
         } else if step.id == 0, let appIcon = appIconImage {
             appIcon
                 .resizable()
-                .frame(width: 110, height: 110)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 6)
+                .scaledToFit()
+                .frame(width: 200, height: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 44, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 44, style: .continuous)
+                        .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.3), radius: 24, x: 0, y: 10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ZStack {
                 RoundedRectangle(cornerRadius: 36, style: .continuous)
@@ -247,13 +269,51 @@ private struct TourStepPageView: View {
                     .font(.system(size: 60, weight: .semibold))
                     .foregroundStyle(.primary)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private func tourImage(_ name: String, size: CGSize) -> some View {
+        Image(name)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size.width, height: size.height)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.35), radius: 20, x: 0, y: 8)
+    }
+
+    private func tourImageNatural(_ name: String) -> some View {
+        Image(name)
+            .resizable()
+            .scaledToFit()
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.35), radius: 20, x: 0, y: 8)
     }
 
     private var appIconImage: Image? {
         #if canImport(UIKit)
-        guard let uiImage = UIImage(named: "AppIcon") else { return nil }
-        return Image(uiImage: uiImage)
+        // AppIcon is an "App Icon" asset set, not a plain imageset — UIImage(named: "AppIcon")
+        // reliably returns nil for those. Resolve the actual compiled icon file via Info.plist instead.
+        if let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
+           let primary = icons["CFBundlePrimaryIcon"] as? [String: Any],
+           let files = primary["CFBundleIconFiles"] as? [String],
+           let lastFile = files.last,
+           let uiImage = UIImage(named: lastFile) {
+            return Image(uiImage: uiImage)
+        }
+        if let uiImage = UIImage(named: "AppIcon") {
+            return Image(uiImage: uiImage)
+        }
+        return nil
         #else
         return nil
         #endif

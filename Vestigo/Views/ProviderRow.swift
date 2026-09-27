@@ -14,6 +14,10 @@ struct ProviderRow: View {
         option.tappableURL
     }
 
+    private var isTMDbOnly: Bool {
+        option.isTMDbOnly
+    }
+
     private var matchedRegionService: RegionStreamingService? {
         option.matchedRegionService(in: regionServiceCatalog)
     }
@@ -42,7 +46,7 @@ struct ProviderRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(option.cleanedServiceName)
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(isTMDbOnly ? .secondary : .primary)
 
                     Text(option.cleanedAvailabilityLine)
                         .font(.caption)
@@ -64,7 +68,7 @@ struct ProviderRow: View {
         }
         .buttonStyle(.plain)
         .liquidGlass(cornerRadius: 22)
-        .opacity(tappableURL == nil ? 0.72 : 1.0)
+        .opacity(isTMDbOnly ? 0.55 : (tappableURL == nil ? 0.72 : 1.0))
         .appScrollTouchSafe()
     }
 
@@ -113,6 +117,33 @@ struct ProviderRow: View {
 }
 
 extension StreamingOption {
+    static func mergedForProviderDisplay(primary: [StreamingOption], tmdb: [StreamingOption]) -> [StreamingOption] {
+        var optionsByProviderKey: [String: StreamingOption] = [:]
+        var orderedKeys: [String] = []
+
+        func insert(_ option: StreamingOption, replacingExisting: Bool) {
+            let key = providerMergeKey(for: option)
+            guard !key.isEmpty else { return }
+
+            if optionsByProviderKey[key] == nil {
+                orderedKeys.append(key)
+                optionsByProviderKey[key] = option
+            } else if replacingExisting {
+                optionsByProviderKey[key] = option
+            }
+        }
+
+        for option in tmdb {
+            insert(option, replacingExisting: false)
+        }
+
+        for option in primary {
+            insert(option, replacingExisting: true)
+        }
+
+        return orderedKeys.compactMap { optionsByProviderKey[$0] }
+    }
+
     static func collapsedForProviderDisplay(_ options: [StreamingOption]) -> [StreamingOption] {
         var optionsByProvider: [String: StreamingOption] = [:]
         var orderedKeys: [String] = []
@@ -133,7 +164,23 @@ extension StreamingOption {
         return orderedKeys.compactMap { optionsByProvider[$0] }
     }
 
+    private static func providerMergeKey(for option: StreamingOption) -> String {
+        if let providerID = option.providerID {
+            return "tmdb:\(providerID)"
+        }
+
+        if let tmdbProviderID = option.matchedCatalogService?.tmdbProviderID {
+            return "tmdb:\(tmdbProviderID)"
+        }
+
+        return StreamingProviderNameNormalizer.dedupName(option.displayServiceName)
+    }
+
     private static func preferredProviderDisplayOption(_ lhs: StreamingOption, _ rhs: StreamingOption) -> StreamingOption {
+        if lhs.isTMDbOnly != rhs.isTMDbOnly {
+            return lhs.isTMDbOnly ? rhs : lhs
+        }
+
         if lhs.isAddOnRoute != rhs.isAddOnRoute {
             return lhs.isAddOnRoute ? rhs : lhs
         }
@@ -149,7 +196,7 @@ extension StreamingOption {
     }
 
     var cleanedAvailabilityLine: String {
-        let parts = [cleanedTypeText, cleanedPriceText, cleanedQualityText]
+        let parts = [cleanedTypeText, cleanedPriceText, cleanedQualityText, sourceText]
             .compactMap { $0 }
 
         if parts.isEmpty {
@@ -164,10 +211,19 @@ extension StreamingOption {
     }
 
     var tappableURL: URL? {
+        guard !isTMDbOnly else { return nil }
         guard let rawURL = openURL?.trimmingCharacters(in: .whitespacesAndNewlines), !rawURL.isEmpty else {
             return nil
         }
         return URL(string: rawURL)
+    }
+
+    var isTMDbOnly: Bool {
+        source?.caseInsensitiveCompare("tmdb") == .orderedSame
+    }
+
+    private var sourceText: String? {
+        isTMDbOnly ? "From TMDb" : nil
     }
 
     private var cleanedTypeText: String? {

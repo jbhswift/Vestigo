@@ -56,7 +56,7 @@ final class VestigoModel: ObservableObject {
     @Published var tmdbProvidersByRegion: [String: [TMDbWatchProviderLogoDTO]] = [:]
     @Published var tmdbGlobalProviders: [TMDbWatchProviderLogoDTO] = []
     @Published var tmdbFallbackKeys: Set<MediaKey> = []
-    var watchmodeBackgroundRetried: Set<MediaKey> = []
+    var streamingBackgroundRetried: Set<MediaKey> = []
     var describeItResultsCache: [String: [ThematicSearchResult]] = [:]
 
     @Published var relatedMediaCache: [MediaKey: [RelatedMediaSection]] = [:]
@@ -92,6 +92,7 @@ final class VestigoModel: ObservableObject {
     @Published var collectionsResetToken = UUID()
     @Published var imageRefreshToken = 0
     @Published var showStreamingSetup = false
+    @Published var showTour = false
     @Published var calendarEventIDs: [MediaKey: String] = [:]
     @Published var showOMDbLimitAlert = false
     @Published var friends: [FriendProfile] = []
@@ -126,6 +127,10 @@ final class VestigoModel: ObservableObject {
     var isApplyingCloudSnapshot = false
     var regionServiceCatalog: [RegionStreamingService] {
         regionServiceCatalogsByRegion[settings.streamingRegion.rawValue] ?? []
+    }
+
+    var allRegionServiceCatalog: [RegionStreamingService] {
+        regionServiceCatalogsByRegion.values.flatMap { $0 }
     }
 
     var tmdbRegionProviders: [TMDbWatchProviderLogoDTO] {

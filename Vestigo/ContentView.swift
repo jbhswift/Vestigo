@@ -109,7 +109,15 @@ struct ContentView: View {
         .sheet(item: $model.selectedPerson) { person in
             PersonDetailView(person: person, model: model)
         }
-        .sheet(isPresented: $model.showStreamingSetup) {
+        .sheet(isPresented: $model.showTour, onDismiss: {
+            UserDefaults.standard.set(true, forKey: "Vestigo.hasSeenTour")
+        }) {
+            OnboardingTourView()
+        }
+        .sheet(isPresented: Binding(
+            get: { model.showStreamingSetup && !model.showTour },
+            set: { model.showStreamingSetup = $0 }
+        )) {
             StreamingServicesSetupSheet(model: model, isOnboarding: true)
         }
         .favouriteReplacementOverlay(model: model)

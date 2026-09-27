@@ -209,7 +209,8 @@ struct TMDbWatchProvidersResponse: Decodable, Hashable {
                     qualityText: "",
                     openURL: region.link,
                     providerID: provider.providerID,
-                    logoPath: provider.logoPath
+                    logoPath: provider.logoPath,
+                    source: "tmdb"
                 )
             }
         }

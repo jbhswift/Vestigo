@@ -61,9 +61,9 @@ struct HomeView: View {
                     Task { await model.loadHome() }
                 }
 
-                ForEach(model.settings.homeCarouselOrder, id: \.self) { carousel in
-                    if !model.settings.homeCarouselHidden.contains(carousel) {
-                        homeCarouselView(for: carousel)
+                ForEach(model.settings.homeDisplayCarouselOrder) { carousel in
+                    if !model.settings.homeDisplayCarouselHidden.contains(carousel) {
+                        homeDisplayCarouselView(for: carousel)
                     }
                 }
             }
@@ -89,40 +89,17 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private func homeCarouselView(for carousel: HomeCarousel) -> some View {
+    private func homeDisplayCarouselView(for carousel: HomeDisplayCarousel) -> some View {
         switch carousel {
         case .trending:
             MediaSection(title: carousel.title, items: model.trending, hideWatchedForUpcoming: false, model: model, openFull: {
                 model.homePath.append(.section(.trending))
             })
-        case .newReleases:
-            MediaSection(title: carousel.title, items: model.newReleases, hideWatchedForUpcoming: false, model: model, openFull: {
-                model.homePath.append(.section(.newReleases))
-            })
-        case .upcoming:
-            if model.settings.showUpcomingReleases, !model.upcoming.isEmpty {
-                MediaSection(title: carousel.title, items: model.upcoming, hideWatchedForUpcoming: true, model: model, openFull: {
-                    model.homePath.append(.section(.upcoming))
-                })
-            }
-        case .recommendations:
-            ForEach(model.settings.recommendationCarouselOrder, id: \.self) { recCarousel in
-                if !model.settings.recommendationCarouselHidden.contains(recCarousel) {
-                    recommendationCarouselView(for: recCarousel)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func recommendationCarouselView(for carousel: RecommendationCarousel) -> some View {
-        switch carousel {
-        case .personalized:
+        case .forYou:
             let sectionItems = filteredRecommendations(model.recommendations)
             if !sectionItems.isEmpty {
-                let sectionTitle = "For you"
-                MediaSection(title: sectionTitle, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
-                    model.homePath.append(.sectionDetail(HomeSectionDetail(title: sectionTitle, items: sectionItems)))
+                MediaSection(title: carousel.title, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
+                    model.homePath.append(.sectionDetail(HomeSectionDetail(title: carousel.title, items: sectionItems)))
                 })
             }
         case .moreLikeLast:
@@ -147,18 +124,26 @@ struct HomeView: View {
             }
         case .watchlistPicks:
             if !watchlistPicks.isEmpty {
-                let sectionTitle = "From your watchlist"
                 let sectionItems = watchlistPicks
-                MediaSection(title: sectionTitle, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
-                    model.homePath.append(.sectionDetail(HomeSectionDetail(title: sectionTitle, items: sectionItems)))
+                MediaSection(title: carousel.title, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
+                    model.homePath.append(.sectionDetail(HomeSectionDetail(title: carousel.title, items: sectionItems)))
                 })
             }
         case .seriesNext:
             let sectionItems = filteredRecommendations(model.seriesNext)
             if !sectionItems.isEmpty {
-                let sectionTitle = "Continue with related series"
-                MediaSection(title: sectionTitle, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
-                    model.homePath.append(.sectionDetail(HomeSectionDetail(title: sectionTitle, items: sectionItems)))
+                MediaSection(title: carousel.title, items: sectionItems, hideWatchedForUpcoming: false, model: model, openFull: {
+                    model.homePath.append(.sectionDetail(HomeSectionDetail(title: carousel.title, items: sectionItems)))
+                })
+            }
+        case .newReleases:
+            MediaSection(title: carousel.title, items: model.newReleases, hideWatchedForUpcoming: false, model: model, openFull: {
+                model.homePath.append(.section(.newReleases))
+            })
+        case .upcoming:
+            if model.settings.showUpcomingReleases, !model.upcoming.isEmpty {
+                MediaSection(title: carousel.title, items: model.upcoming, hideWatchedForUpcoming: true, model: model, openFull: {
+                    model.homePath.append(.section(.upcoming))
                 })
             }
         }

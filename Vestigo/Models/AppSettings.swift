@@ -49,6 +49,8 @@ struct AppSettings: Codable, Hashable {
     var socialMyRecordName: String = ""
     var recommendationCarouselOrder: [RecommendationCarousel] = RecommendationCarousel.allCases
     var recommendationCarouselHidden: Set<RecommendationCarousel> = [.moreLikeLast, .moreLikeFavourite, .watchlistPicks, .seriesNext]
+    var homeDisplayCarouselOrder: [HomeDisplayCarousel] = [.trending, .forYou, .moreLikeLast, .moreLikeFavourite, .watchlistPicks, .seriesNext, .newReleases, .upcoming]
+    var homeDisplayCarouselHidden: Set<HomeDisplayCarousel> = [.moreLikeLast, .moreLikeFavourite, .watchlistPicks, .seriesNext]
     var omdbPrimaryKey: String = ""
     var omdbTierLimit: Int = 1_000
     var omdbDailyRequestCount: Int = 0
@@ -101,6 +103,8 @@ struct AppSettings: Codable, Hashable {
         case homeCarouselHidden
         case recommendationCarouselOrder = "forYouCarouselOrder"
         case recommendationCarouselHidden = "forYouCarouselHidden"
+        case homeDisplayCarouselOrder
+        case homeDisplayCarouselHidden
         case omdbPrimaryKey
         case omdbTierLimit
         case omdbDailyRequestCount
@@ -188,6 +192,15 @@ struct AppSettings: Codable, Hashable {
         let savedRecHidden = ((try? container.decodeIfPresent([String].self, forKey: .recommendationCarouselHidden)) ?? [])
             .compactMap(RecommendationCarousel.init(rawValue:))
         recommendationCarouselHidden = savedRecHidden.isEmpty ? recommendationCarouselHidden : Set(savedRecHidden)
+
+        if let savedDisplayOrder = try container.decodeIfPresent([HomeDisplayCarousel].self, forKey: .homeDisplayCarouselOrder) {
+            homeDisplayCarouselOrder = Self.mergedOrder(saved: savedDisplayOrder, defaults: HomeDisplayCarousel.allCases)
+            homeDisplayCarouselHidden = try container.decodeIfPresent(Set<HomeDisplayCarousel>.self, forKey: .homeDisplayCarouselHidden) ?? homeDisplayCarouselHidden
+        } else {
+            homeDisplayCarouselOrder = Self.displayOrder(homeOrder: homeCarouselOrder, recommendationOrder: recommendationCarouselOrder)
+            homeDisplayCarouselHidden = Self.displayHidden(homeHidden: homeCarouselHidden, recommendationHidden: recommendationCarouselHidden)
+        }
+
         omdbPrimaryKey = try container.decodeIfPresent(String.self, forKey: .omdbPrimaryKey) ?? omdbPrimaryKey
         omdbTierLimit = try container.decodeIfPresent(Int.self, forKey: .omdbTierLimit) ?? omdbTierLimit
         omdbDailyRequestCount = try container.decodeIfPresent(Int.self, forKey: .omdbDailyRequestCount) ?? omdbDailyRequestCount
@@ -219,6 +232,27 @@ struct AppSettings: Codable, Hashable {
         let present = Set(result)
         result.append(contentsOf: defaults.filter { !present.contains($0) })
         return result
+    }
+
+    private static func displayOrder(homeOrder: [HomeCarousel], recommendationOrder: [RecommendationCarousel]) -> [HomeDisplayCarousel] {
+        let recommendationRows = recommendationOrder.map(HomeDisplayCarousel.init(recommendationCarousel:))
+        let migratedOrder = homeOrder.flatMap { carousel -> [HomeDisplayCarousel] in
+            if carousel == .recommendations {
+                return recommendationRows
+            }
+            return [HomeDisplayCarousel(homeCarousel: carousel)]
+        }
+        return mergedOrder(saved: migratedOrder, defaults: HomeDisplayCarousel.allCases)
+    }
+
+    private static func displayHidden(homeHidden: Set<HomeCarousel>, recommendationHidden: Set<RecommendationCarousel>) -> Set<HomeDisplayCarousel> {
+        var hidden = Set(homeHidden.filter { $0 != .recommendations }.map(HomeDisplayCarousel.init(homeCarousel:)))
+        if homeHidden.contains(.recommendations) {
+            hidden.formUnion(RecommendationCarousel.allCases.map(HomeDisplayCarousel.init(recommendationCarousel:)))
+        } else {
+            hidden.formUnion(recommendationHidden.map(HomeDisplayCarousel.init(recommendationCarousel:)))
+        }
+        return hidden
     }
 }
 

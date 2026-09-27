@@ -164,6 +164,7 @@ function isAllowedTMDbProxyPath(path: string) {
     /^\/tv\/(popular|on_the_air|airing_today)$/,
     /^\/search\/(multi|movie|tv|person)$/,
     /^\/discover\/(movie|tv)$/,
+    /^\/watch\/providers\/(movie|tv)$/,
     /^\/movie\/\d+\/(recommendations|similar|external_ids|release_dates|keywords)$/,
     /^\/tv\/\d+\/(recommendations|similar|external_ids|content_ratings|keywords)$/,
     /^\/movie\/\d+$/,
@@ -406,7 +407,7 @@ function normalizeWatchmodeSource(source: any) {
   }
 }
 
-function watchmodeSourceRank(source: any) {
+function streamingSourceRank(source: any) {
   const type = String(source.type ?? "").toLowerCase()
   const quality = String(source.qualityText ?? "").toUpperCase()
   const priceText = String(source.priceText ?? "")
@@ -417,11 +418,13 @@ function watchmodeSourceRank(source: any) {
   if (type === "free") typeRank = 1
   if (type === "rent") typeRank = 2
   if (type === "buy") typeRank = 3
+  if (type === "addon") typeRank = 4
 
   let qualityRank = 99
   if (quality === "4K") qualityRank = 0
-  if (quality === "HD") qualityRank = 1
-  if (quality === "SD") qualityRank = 2
+  if (quality === "QHD") qualityRank = 1
+  if (quality === "HD") qualityRank = 2
+  if (quality === "SD") qualityRank = 3
 
   return {
     typeRank,
@@ -430,7 +433,7 @@ function watchmodeSourceRank(source: any) {
   }
 }
 
-function dedupeWatchmodeSources(sources: any[]) {
+function dedupeStreamingSources(sources: any[]) {
   const bestByKey = new Map<string, any>()
 
   for (const source of sources) {
@@ -442,8 +445,8 @@ function dedupeWatchmodeSources(sources: any[]) {
       continue
     }
 
-    const currentRank = watchmodeSourceRank(source)
-    const existingRank = watchmodeSourceRank(existing)
+    const currentRank = streamingSourceRank(source)
+    const existingRank = streamingSourceRank(existing)
 
     if (currentRank.priceRank < existingRank.priceRank) {
       bestByKey.set(key, source)
@@ -456,8 +459,8 @@ function dedupeWatchmodeSources(sources: any[]) {
   }
 
   return Array.from(bestByKey.values()).sort((a: any, b: any) => {
-    const lhs = watchmodeSourceRank(a)
-    const rhs = watchmodeSourceRank(b)
+    const lhs = streamingSourceRank(a)
+    const rhs = streamingSourceRank(b)
 
     if (lhs.typeRank !== rhs.typeRank) return lhs.typeRank - rhs.typeRank
     if (lhs.priceRank !== rhs.priceRank) return lhs.priceRank - rhs.priceRank
@@ -596,11 +599,142 @@ async function watchmodeSourcesForTMDbID(
     return []
   }
 
-  return dedupeWatchmodeSources(
+  return dedupeStreamingSources(
     sources
       .map(normalizeWatchmodeSource)
       .filter((source: any) => source.serviceName && (source.webURL || source.iosURL))
   )
+}
+
+// --- Movie of the Night (Streaming Availability API) helper functions ---
+async function fetchMOTN(path: string, params: Record<string, string> = {}) {
+  const motnKey = Deno.env.get("MOVIE_OF_THE_NIGHT_KEY")
+
+  if (!motnKey) {
+    throw new Error("Missing MOVIE_OF_THE_NIGHT_KEY")
+  }
+
+  const url = new URL(`https://api.movieofthenight.com/v4${path}`)
+
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value)
+  }
+
+  const response = await fetch(url, {
+    headers: { "X-API-Key": motnKey }
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`MoTN request failed: ${response.status} ${text}`)
+  }
+
+  trackApiCall("motn")
+  incrementServiceCall("motn")
+  return await response.json()
+}
+
+function normalizeMOTNOption(option: any) {
+  const rawType = String(option?.type ?? "").toLowerCase()
+  const serviceName = option?.service?.name ?? option?.addon?.name ?? "Unknown service"
+
+  let typeText = "Watch"
+  if (rawType === "subscription") typeText = "Subscription"
+  if (rawType === "free") typeText = "Free"
+  if (rawType === "rent") typeText = "Rent"
+  if (rawType === "buy") typeText = "Buy"
+  if (rawType === "addon") typeText = "Addon"
+
+  const rawQuality = String(option?.quality ?? "").toLowerCase()
+  let qualityText: string | null = null
+  if (rawQuality === "uhd") qualityText = "4K"
+  if (rawQuality === "qhd") qualityText = "QHD"
+  if (rawQuality === "hd") qualityText = "HD"
+  if (rawQuality === "sd") qualityText = "SD"
+
+  let priceText: string | null = null
+  if (typeText === "Subscription" || typeText === "Addon") {
+    priceText = "Included"
+  } else if (typeText === "Free") {
+    priceText = "Free"
+  } else {
+    // MoTN's exact price-object field names aren't documented beyond "detailed pricing info" —
+    // parse defensively; only paid rent/buy options need a price at all.
+    const price = option?.price
+    const formatted = typeof price?.formatted === "string" ? price.formatted : null
+    const rawAmount = price?.amount
+    const amount = typeof rawAmount === "number" ? rawAmount : (typeof rawAmount === "string" ? Number(rawAmount) : NaN)
+    const currency = typeof price?.currency === "string" ? price.currency : null
+    if (formatted) {
+      priceText = formatted
+    } else if (Number.isFinite(amount)) {
+      priceText = !currency || currency === "USD" ? `$${amount.toFixed(2)}` : `${amount.toFixed(2)} ${currency}`
+    }
+  }
+
+  const rawLink = typeof option?.link === "string" ? option.link : null
+  const openURL = rawLink && rawLink.startsWith("http") ? rawLink : null
+
+  return {
+    serviceName,
+    type: typeText,
+    priceText: priceText ?? "",
+    qualityText: qualityText ?? "",
+    openURL
+  }
+}
+
+async function motnSourcesForTMDbID(
+  tmdbID: number,
+  kind: "movie" | "tv",
+  country: string,
+  imdbID?: string
+) {
+  const trimmedImdbID = imdbID?.trim()
+  const id = trimmedImdbID && trimmedImdbID.length > 0
+    ? trimmedImdbID
+    : `${kind === "movie" ? "movie" : "tv"}/${tmdbID}`
+
+  const show = await fetchMOTN(`/shows/${id}`, {
+    country: country.toLowerCase()
+  })
+
+  const options = show?.streamingOptions?.[country.toLowerCase()]
+
+  if (!Array.isArray(options)) {
+    return []
+  }
+
+  return dedupeStreamingSources(
+    options
+      .map(normalizeMOTNOption)
+      .filter((source: any) => source.serviceName && source.openURL)
+  )
+}
+
+// Logo URLs (including SVGs) are passed straight through — the iOS client's RemoteLogoView
+// already renders SVG and raster logos directly, so no server-side rasterization is needed.
+function normalizeMOTNCountryService(service: any) {
+  const images = service?.imageSet ?? {}
+  const logoURL = images.darkThemeImage ?? images.whiteImage ?? images.lightThemeImage ?? null
+
+  return {
+    id: String(service?.id ?? ""),
+    name: String(service?.name ?? ""),
+    homePage: typeof service?.homePage === "string" ? service.homePage : null,
+    themeColorHex: typeof service?.themeColorCode === "string" ? service.themeColorCode : null,
+    logoURL,
+    isFree: service?.streamingOptionTypes?.free === true
+  }
+}
+
+async function motnCountryServices(countryCode: string) {
+  const country = await fetchMOTN(`/countries/${countryCode.toLowerCase()}`)
+  const services = Array.isArray(country?.services) ? country.services : []
+
+  return services
+    .map(normalizeMOTNCountryService)
+    .filter((service: any) => service.id && service.name)
 }
 
 async function fetchWikidataSPARQL(query: string) {
@@ -1179,7 +1313,7 @@ function incrementServiceCall(service: string): void {
   }
 }
 
-const SERVICE_USAGE_KEYS = ["tmdb", "watchmode", "tvdb", "wikidata", "openrouter", "amc", "youtube", "supabase_edge"]
+const SERVICE_USAGE_KEYS = ["tmdb", "watchmode", "motn", "tvdb", "wikidata", "openrouter", "amc", "youtube", "supabase_edge"]
 
 async function getServiceUsage(days = 30): Promise<Record<string, number>> {
   const kv = await Deno.openKv()
@@ -1264,6 +1398,100 @@ function isCacheFresh(updatedAt: string): boolean {
   lastSunday.setUTCDate(now.getUTCDate() - now.getUTCDay())
   lastSunday.setUTCHours(0, 0, 0, 0)
   return updated >= lastSunday
+}
+
+// --- Streaming sources: persistent Supabase DB cache of per-title MoTN/Watchmode results ---
+
+async function getStreamingCache(cacheKey: string): Promise<{ source: string, items: any[], updatedAt: string } | null> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  if (!supabaseUrl || !supabaseKey) return null
+  try {
+    const resp = await fetchWithTimeout(
+      `${supabaseUrl}/rest/v1/streaming_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=source,items,updated_at`,
+      { headers: { "apikey": supabaseKey, "Authorization": `Bearer ${supabaseKey}` } }
+    )
+    if (!resp.ok) return null
+    const rows = await resp.json()
+    if (!Array.isArray(rows) || rows.length === 0) return null
+    return { source: rows[0].source, items: rows[0].items, updatedAt: rows[0].updated_at }
+  } catch {
+    return null
+  }
+}
+
+async function setStreamingCache(cacheKey: string, source: string, items: any[]): Promise<void> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  if (!supabaseUrl || !supabaseKey) return
+  try {
+    await fetchWithTimeout(
+      `${supabaseUrl}/rest/v1/streaming_cache`,
+      {
+        method: "POST",
+        headers: {
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates"
+        },
+        body: JSON.stringify({ cache_key: cacheKey, source, items, updated_at: new Date().toISOString() })
+      }
+    )
+  } catch { /* non-fatal */ }
+}
+
+function isStreamingCacheFresh(updatedAt: string): boolean {
+  const updated = new Date(updatedAt)
+  const now = new Date()
+  return now.getTime() - updated.getTime() < 72 * 60 * 60 * 1000
+}
+
+// --- Streaming catalog: persistent Supabase DB cache of MoTN's per-country service list ---
+
+async function getStreamingCatalogCache(countryCode: string): Promise<{ items: any[], updatedAt: string } | null> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  if (!supabaseUrl || !supabaseKey) return null
+  try {
+    const resp = await fetchWithTimeout(
+      `${supabaseUrl}/rest/v1/motn_country_services_cache?country_code=eq.${encodeURIComponent(countryCode)}&select=items,updated_at`,
+      { headers: { "apikey": supabaseKey, "Authorization": `Bearer ${supabaseKey}` } }
+    )
+    if (!resp.ok) return null
+    const rows = await resp.json()
+    if (!Array.isArray(rows) || rows.length === 0) return null
+    return { items: rows[0].items, updatedAt: rows[0].updated_at }
+  } catch {
+    return null
+  }
+}
+
+async function setStreamingCatalogCache(countryCode: string, items: any[]): Promise<void> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  if (!supabaseUrl || !supabaseKey) return
+  try {
+    await fetchWithTimeout(
+      `${supabaseUrl}/rest/v1/motn_country_services_cache`,
+      {
+        method: "POST",
+        headers: {
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates"
+        },
+        body: JSON.stringify({ country_code: countryCode, items, updated_at: new Date().toISOString() })
+      }
+    )
+  } catch { /* non-fatal */ }
+}
+
+function isStreamingCatalogCacheFresh(updatedAt: string): boolean {
+  const updated = new Date(updatedAt)
+  const now = new Date()
+  return now.getTime() - updated.getTime() < 7 * 24 * 60 * 60 * 1000
 }
 
 async function enrichPoolWithRatings(kind: "movie" | "tv", dtos: any[]): Promise<any[]> {
@@ -1454,6 +1682,92 @@ Deno.serve(async (req) => {
         count: sources.length,
         sources
       })
+    }
+
+    if (url.pathname.endsWith("/streaming-sources")) {
+      const tmdbID = Number(url.searchParams.get("tmdbID") ?? url.searchParams.get("id"))
+      const rawKind = String(url.searchParams.get("kind") ?? "movie").toLowerCase()
+      const country = String(url.searchParams.get("country") ?? "US").toUpperCase()
+      const clientImdbID = url.searchParams.get("imdbID") ?? undefined
+      const title = url.searchParams.get("title") ?? undefined
+      const year = url.searchParams.get("year") ?? undefined
+
+      if (!Number.isFinite(tmdbID) || tmdbID <= 0) {
+        return Response.json(
+          { ok: false, error: "Missing or invalid tmdbID" },
+          { status: 400 }
+        )
+      }
+
+      if (rawKind !== "movie" && rawKind !== "tv") {
+        return Response.json(
+          { ok: false, error: "kind must be movie or tv" },
+          { status: 400 }
+        )
+      }
+
+      const cacheKey = `${rawKind}:${tmdbID}:${country}`
+      const cached = await getStreamingCache(cacheKey)
+
+      if (cached && isStreamingCacheFresh(cached.updatedAt)) {
+        return Response.json({
+          ok: true,
+          source: cached.source,
+          tmdbID,
+          kind: rawKind,
+          country,
+          count: cached.items.length,
+          sources: cached.items
+        })
+      }
+
+      // Movie of the Night is the primary source; Watchmode is the fallback if MoTN fails.
+      let source = "motn"
+      let sources: any[]
+      try {
+        sources = await motnSourcesForTMDbID(tmdbID, rawKind, country, clientImdbID)
+      } catch {
+        source = "watchmode"
+        sources = await watchmodeSourcesForTMDbID(tmdbID, rawKind, country, clientImdbID, title, year)
+      }
+
+      await setStreamingCache(cacheKey, source, sources)
+
+      return Response.json({
+        ok: true,
+        source,
+        tmdbID,
+        kind: rawKind,
+        country,
+        count: sources.length,
+        sources
+      })
+    }
+
+    if (url.pathname.endsWith("/streaming-catalog")) {
+      const country = String(url.searchParams.get("country") ?? "US").toUpperCase()
+
+      const cached = await getStreamingCatalogCache(country)
+      if (cached && isStreamingCatalogCacheFresh(cached.updatedAt)) {
+        return Response.json({ ok: true, country, services: cached.items })
+      }
+
+      // Cache is missing or past its refresh window — try a live fetch, but the cache is
+      // persistent: only a successful fetch with genuinely different data overwrites it.
+      // A failed fetch (or one that returns the same data) never discards what's stored.
+      try {
+        const services = await motnCountryServices(country)
+        const isUnchanged = cached && JSON.stringify(services) === JSON.stringify(cached.items)
+        if (!isUnchanged) {
+          await setStreamingCatalogCache(country, services)
+        }
+        return Response.json({ ok: true, country, services })
+      } catch {
+        if (cached) {
+          return Response.json({ ok: true, country, services: cached.items })
+        }
+        return Response.json({ ok: false, country, services: [] })
+      }
     }
 
     if (url.pathname.endsWith("/ratings")) {

@@ -190,6 +190,30 @@ struct SettingsDataSection: View {
             .buttonStyle(.plain)
             .settingBubble()
 
+            Button {
+                model.replayTour()
+            } label: {
+                HStack(alignment: .center, spacing: 10) {
+                    Image(systemName: "map")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 22, height: 22, alignment: .center)
+
+                    Text("Replay app tour")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
+                        .frame(height: 22, alignment: .center)
+
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 32, alignment: .center)
+                .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .settingBubble()
+
             Button("Reset settings") {
                 model.settings = AppSettings()
                 model.searchFilter = model.settings.defaultSearchFilter

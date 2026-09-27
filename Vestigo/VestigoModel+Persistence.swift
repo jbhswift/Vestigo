@@ -34,6 +34,12 @@ extension VestigoModel {
         if settings.recommendationCarouselHidden.isDisjoint(with: subCarousels) {
             settings.recommendationCarouselHidden.formUnion(subCarousels)
         }
+
+        // Same migration for the unified home carousel list.
+        let displaySubCarousels: Set<HomeDisplayCarousel> = [.moreLikeLast, .moreLikeFavourite, .watchlistPicks, .seriesNext]
+        if settings.homeDisplayCarouselHidden.isDisjoint(with: displaySubCarousels) {
+            settings.homeDisplayCarouselHidden.formUnion(displaySubCarousels)
+        }
     }
 
     func syncFromCloudOnLaunch() async {
@@ -68,6 +74,17 @@ extension VestigoModel {
         }
     }
 
+    func offerTourIfNeeded() {
+        if !UserDefaults.standard.bool(forKey: "Vestigo.hasSeenTour") {
+            showTour = true
+        }
+    }
+
+    func replayTour() {
+        UserDefaults.standard.set(false, forKey: "Vestigo.hasSeenTour")
+        showTour = true
+    }
+
     func completeStreamingSetup() {
         settings.hasSeenStreamingSetup = true
         showStreamingSetup = false
@@ -100,6 +117,15 @@ extension VestigoModel {
         do {
             regionServiceCatalogsByRegion[region] = try await streamingCatalog.services(forRegion: region)
         } catch { }
+    }
+
+    func loadAllRegionServiceCatalogs() async {
+        for region in StreamingRegion.allCases.map(\.rawValue) {
+            guard regionServiceCatalogsByRegion[region] == nil else { continue }
+            do {
+                regionServiceCatalogsByRegion[region] = try await streamingCatalog.services(forRegion: region)
+            } catch { }
+        }
     }
 
     func loadTMDbRegionProviders() async {

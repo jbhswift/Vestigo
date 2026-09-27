@@ -343,6 +343,7 @@ struct StreamingOption: Codable, Hashable, Identifiable {
     let openURL: String?
     let providerID: Int?
     let logoPath: String?
+    let source: String?
 
     init(
         serviceName: String,
@@ -351,7 +352,8 @@ struct StreamingOption: Codable, Hashable, Identifiable {
         qualityText: String,
         openURL: String? = nil,
         providerID: Int? = nil,
-        logoPath: String? = nil
+        logoPath: String? = nil,
+        source: String? = nil
     ) {
         self.serviceName = serviceName
         self.type = type
@@ -360,6 +362,7 @@ struct StreamingOption: Codable, Hashable, Identifiable {
         self.openURL = openURL
         self.providerID = providerID
         self.logoPath = logoPath
+        self.source = source
     }
 }
 

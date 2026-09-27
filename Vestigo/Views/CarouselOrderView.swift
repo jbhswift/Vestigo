@@ -5,21 +5,21 @@ struct CarouselOrderContent: View {
     @ObservedObject var model: VestigoModel
 
     private var totalRowCount: Int {
-        model.settings.homeCarouselOrder.count + model.settings.recommendationCarouselOrder.count
+        model.settings.homeDisplayCarouselOrder.count
     }
 
     var body: some View {
         List {
-            ForEach(model.settings.homeCarouselOrder, id: \.self) { carousel in
+            ForEach(model.settings.homeDisplayCarouselOrder) { carousel in
                 CarouselOrderRow(
                     title: carousel.title,
-                    isHidden: model.settings.homeCarouselHidden.contains(carousel),
+                    isHidden: model.settings.homeDisplayCarouselHidden.contains(carousel),
                     accentColor: model.settings.accentColor,
                     toggle: {
-                        if model.settings.homeCarouselHidden.contains(carousel) {
-                            model.settings.homeCarouselHidden.remove(carousel)
+                        if model.settings.homeDisplayCarouselHidden.contains(carousel) {
+                            model.settings.homeDisplayCarouselHidden.remove(carousel)
                         } else {
-                            model.settings.homeCarouselHidden.insert(carousel)
+                            model.settings.homeDisplayCarouselHidden.insert(carousel)
                         }
                     }
                 )
@@ -28,28 +28,7 @@ struct CarouselOrderContent: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
             }
             .onMove { indices, newOffset in
-                model.settings.homeCarouselOrder.move(fromOffsets: indices, toOffset: newOffset)
-            }
-
-            ForEach(model.settings.recommendationCarouselOrder, id: \.self) { carousel in
-                CarouselOrderRow(
-                    title: carousel.title,
-                    isHidden: model.settings.recommendationCarouselHidden.contains(carousel),
-                    accentColor: model.settings.accentColor,
-                    toggle: {
-                        if model.settings.recommendationCarouselHidden.contains(carousel) {
-                            model.settings.recommendationCarouselHidden.remove(carousel)
-                        } else {
-                            model.settings.recommendationCarouselHidden.insert(carousel)
-                        }
-                    }
-                )
-                .listRowBackground(Color.clear)
-                .listRowSeparatorTint(.primary.opacity(0.1))
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-            }
-            .onMove { indices, newOffset in
-                model.settings.recommendationCarouselOrder.move(fromOffsets: indices, toOffset: newOffset)
+                model.settings.homeDisplayCarouselOrder.move(fromOffsets: indices, toOffset: newOffset)
             }
         }
         .listStyle(.plain)

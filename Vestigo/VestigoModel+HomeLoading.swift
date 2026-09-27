@@ -20,6 +20,7 @@ extension VestigoModel {
         loadLocal()
         loadFriendsCache()
         loadUserAvatar()
+        offerTourIfNeeded()
         offerStreamingSetupIfNeeded()
 
         NotificationCenter.default.addObserver(
