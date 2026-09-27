@@ -11,6 +11,7 @@ struct PickForMeResultsView: View {
     let onEditAnswers: () -> Void
     let onToggleNotInterested: (MediaItem) -> Void
     let onToggleNeverShowAgain: (MediaItem) -> Void
+    @State private var showCollections = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -27,6 +28,14 @@ struct PickForMeResultsView: View {
                     PosterView(item: item, width: 164, height: 238, isFavourite: model.library.isFavourite(item))
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    MediaItemContextMenuActions(item: item, hideWatched: false, model: model, swipeContext: .none) {
+                        showCollections = true
+                    }
+                }
+                .sheet(isPresented: $showCollections) {
+                    AddToCollectionSheet(item: item, model: model)
+                }
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text(item.title)
