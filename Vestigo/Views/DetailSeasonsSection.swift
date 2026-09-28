@@ -55,8 +55,8 @@ struct SeasonDropdownView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button(action: toggle) {
-                HStack(spacing: 12) {
+            HStack(spacing: 12) {
+                Button(action: toggle) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(season.name)
                             .font(.headline.bold())
@@ -70,34 +70,38 @@ struct SeasonDropdownView: View {
                             .minimumScaleFactor(0.8)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
 
-                    Spacer()
+                Spacer()
 
-                    if friendMode == nil && (!hasUnairedEpisodes || isSeasonWatched) {
-                        Button(isSeasonWatched ? "Unwatch" : "Mark") {
-                            model.markSeason(
-                                show: show,
-                                season: season.number,
-                                episodeCount: max(season.episodeCount, season.episodes.count),
-                                watched: !isSeasonWatched
-                            )
-                        }
-                        .font(.caption.bold())
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .buttonStyle(.bordered)
-                        .clipShape(Capsule())
+                if friendMode == nil && (!hasUnairedEpisodes || isSeasonWatched) {
+                    Button(isSeasonWatched ? "Unwatch" : "Mark") {
+                        model.markSeason(
+                            show: show,
+                            season: season.number,
+                            episodeCount: max(season.episodeCount, season.episodes.count),
+                            watched: !isSeasonWatched
+                        )
                     }
+                    .font(.caption.bold())
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .buttonStyle(.bordered)
+                    .clipShape(Capsule())
+                }
 
+                Button(action: toggle) {
                     Image(systemName: "chevron.down")
                         .font(.caption.bold())
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                         .foregroundStyle(.secondary)
+                        .contentShape(Rectangle())
                 }
-                .contentShape(Rectangle())
-                .padding(12)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+            .padding(12)
 
             if isExpanded {
                 Divider()
@@ -184,6 +188,7 @@ struct EpisodeRowView: View {
         }
         .buttonStyle(.plain)
         .disabled(friendMode != nil || episode.isUpcoming)
+        .accessibilityLabel("\(episode.number). \(episode.title), \(friendMode != nil ? (friendMode! ? "watched" : "not watched") : (episode.isUpcoming ? "upcoming" : (isWatched ? "watched" : "not watched")))")
     }
 
     private var isWatched: Bool {

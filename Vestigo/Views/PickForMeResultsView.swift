@@ -28,6 +28,7 @@ struct PickForMeResultsView: View {
                     PosterView(item: item, width: 164, height: 238, isFavourite: model.library.isFavourite(item))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(item.title)
                 .contextMenu {
                     MediaItemContextMenuActions(item: item, hideWatched: false, model: model, swipeContext: .none) {
                         showCollections = true
@@ -75,6 +76,7 @@ struct PickForMeResultsView: View {
                         .liquidGlass(cornerRadius: 24)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(model.library.isInWatchlist(item.key) ? "Remove from watchlist" : "Add to watchlist")
 
                 Button {
                     model.toggleWatched(item)
@@ -87,6 +89,7 @@ struct PickForMeResultsView: View {
                 .buttonStyle(.plain)
                 .disabled(item.isUpcoming)
                 .opacity(item.isUpcoming ? 0.45 : 1)
+                .accessibilityLabel(model.library.isWatched(item.key) ? "Mark unwatched" : "Mark watched")
             }
 
             Button {

@@ -240,6 +240,8 @@ private struct QRCodeOverlay: View {
             Color.black.opacity(0.5)
                 .ignoresSafeArea()
                 .onTapGesture { onDismiss() }
+                .accessibilityLabel("Dismiss")
+                .accessibilityAddTraits(.isButton)
 
             VStack(spacing: 20) {
                 Text("Scan to add me on Vestigo")
@@ -254,6 +256,7 @@ private struct QRCodeOverlay: View {
                         .frame(width: 260, height: 260)
                         .background(Color.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .accessibilityLabel("QR code to add you as a friend")
                 } else {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(.secondary.opacity(0.2))

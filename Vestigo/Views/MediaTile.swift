@@ -24,6 +24,7 @@ struct MediaTile: View {
                 PosterView(item: item, width: 148, height: 214, isFavourite: model.library.isFavourite(item))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(item.title)
 
             .contextMenu {
                 MediaItemContextMenuActions(item: item, hideWatched: hideWatched, model: model, swipeContext: swipeContext) {
@@ -48,7 +49,8 @@ struct MediaTile: View {
             HStack(spacing: 7) {
                 TileIconButton(
                     systemName: model.library.isInWatchlist(item.key) ? "bookmark.fill" : "bookmark",
-                    tint: .white
+                    tint: .white,
+                    accessibilityLabel: model.library.isInWatchlist(item.key) ? "Remove from watchlist" : "Add to watchlist"
                 ) {
                     model.toggleWatchlist(item)
                 }
@@ -56,7 +58,8 @@ struct MediaTile: View {
                 if !hideWatched && !item.isUpcoming {
                     TileIconButton(
                         systemName: model.library.isWatched(item.key) ? "checkmark.circle.fill" : "checkmark.circle",
-                        tint: .white
+                        tint: .white,
+                        accessibilityLabel: model.library.isWatched(item.key) ? "Mark unwatched" : "Mark watched"
                     ) {
                         model.toggleWatched(item)
                     }
@@ -185,6 +188,7 @@ struct MediaItemContextMenuActions: View {
 struct TileIconButton: View {
     let systemName: String
     var tint: Color = .secondary
+    var accessibilityLabel: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -197,6 +201,6 @@ struct TileIconButton: View {
                 .liquidGlass(cornerRadius: 14)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(systemName.contains("bookmark") ? "Save" : "Watched")
+        .accessibilityLabel(accessibilityLabel ?? (systemName.contains("bookmark") ? "Save" : "Watched"))
     }
 }

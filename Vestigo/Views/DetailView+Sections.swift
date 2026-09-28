@@ -43,6 +43,8 @@ extension DetailView {
                     .onTapGesture {
                         isPosterPreviewPresented = false
                     }
+                    .accessibilityLabel("Dismiss")
+                    .accessibilityAddTraits(.isButton)
 
                 posterPreviewImage(maxSize: proxy.size)
                     .onTapGesture { }

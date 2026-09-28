@@ -69,6 +69,7 @@ struct TrailersSection: View {
                 .background(.white.opacity(0.12), in: Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(direction < 0 ? "Previous trailer" : "Next trailer")
         .opacity(visible ? 1 : 0)
         .allowsHitTesting(visible)
     }

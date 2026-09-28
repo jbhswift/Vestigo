@@ -329,6 +329,7 @@ struct MediaListRow: View {
             PosterView(item: item, width: 72, height: 104, isFavourite: model.library.isFavourite(item))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(item.title)
     }
 
     private var textAndActions: some View {
@@ -389,16 +390,25 @@ struct MediaListRow: View {
 
     private var actionButtons: some View {
         HStack(spacing: 7) {
-            TileIconButton(systemName: model.library.isInWatchlist(item.key) ? "bookmark.fill" : "bookmark") {
+            TileIconButton(
+                systemName: model.library.isInWatchlist(item.key) ? "bookmark.fill" : "bookmark",
+                accessibilityLabel: model.library.isInWatchlist(item.key) ? "Remove from watchlist" : "Add to watchlist"
+            ) {
                 model.toggleWatchlist(item)
             }
 
             if item.isUpcoming {
-                TileIconButton(systemName: model.hasCalendarEvent(for: item) ? "calendar.badge.checkmark" : "calendar.badge.plus") {
+                TileIconButton(
+                    systemName: model.hasCalendarEvent(for: item) ? "calendar.badge.checkmark" : "calendar.badge.plus",
+                    accessibilityLabel: model.hasCalendarEvent(for: item) ? "Remove from calendar" : "Add to calendar"
+                ) {
                     model.addReleaseToCalendar(item)
                 }
             } else {
-                TileIconButton(systemName: model.library.isWatched(item.key) ? "checkmark.circle.fill" : "checkmark.circle") {
+                TileIconButton(
+                    systemName: model.library.isWatched(item.key) ? "checkmark.circle.fill" : "checkmark.circle",
+                    accessibilityLabel: model.library.isWatched(item.key) ? "Mark unwatched" : "Mark watched"
+                ) {
                     model.toggleWatched(item)
                 }
             }

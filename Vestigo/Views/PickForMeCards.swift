@@ -143,6 +143,7 @@ struct PickForMeOptionButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -265,5 +266,22 @@ struct RuntimeRangeSlider: View {
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
         .liquidGlass(cornerRadius: 28)
+        .accessibilityElement()
+        .accessibilityLabel("Runtime range")
+        .accessibilityValue("\(range.minMinutes > 0 ? PickForMeRuntimeRange.formatMinutes(range.minMinutes) : "Any") to \(range.maxMinutes > 0 ? PickForMeRuntimeRange.formatMinutes(range.maxMinutes) : "Any")")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment:
+                let newIndex = min(rightIndex + 1, steps.count - 1)
+                let newMax = newIndex == steps.count - 1 ? 0 : steps[newIndex]
+                range = PickForMeRuntimeRange(minMinutes: range.minMinutes, maxMinutes: newMax)
+            case .decrement:
+                let newIndex = max(rightIndex - 1, leftIndex + 1)
+                let newMax = newIndex == steps.count - 1 ? 0 : steps[newIndex]
+                range = PickForMeRuntimeRange(minMinutes: range.minMinutes, maxMinutes: newMax)
+            @unknown default:
+                break
+            }
+        }
     }
 }

@@ -45,6 +45,7 @@ extension PickForMeView {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("About Pick For Me")
                 .sheet(isPresented: $showingInfoSheet) {
                     PickForMeInfoSheet()
                 }
