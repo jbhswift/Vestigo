@@ -299,6 +299,7 @@ struct MediaListRow: View {
     @State private var showCollections = false
     var showsRole: Bool = false
     var openItem: ((MediaItem) -> Void)? = nil
+    @ScaledMetric(relativeTo: .headline) private var titleFontSize: CGFloat = 18
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -359,7 +360,7 @@ struct MediaListRow: View {
 
     private var titleText: some View {
         Text(item.title)
-            .font(.system(size: 18, weight: .black, design: .rounded))
+            .font(.system(size: titleFontSize, weight: .black, design: .rounded))
             .foregroundStyle(.primary)
             .lineLimit(2)
     }
