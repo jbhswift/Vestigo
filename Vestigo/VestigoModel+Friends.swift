@@ -3,10 +3,18 @@ import Foundation
 
 extension VestigoModel {
 
+    private func ensureSocialRecordName() async -> Bool {
+        if !settings.socialMyRecordName.isEmpty { return true }
+        guard let myRecord = await publicSync.getMyRecordName() else { return false }
+        settings.socialMyRecordName = myRecord
+        saveSettings()
+        return true
+    }
+
     func checkIncomingFriendRequests() async {
         guard Date().timeIntervalSince(lastIncomingCheck) > 60 else { return }
         lastIncomingCheck = Date()
-        guard !settings.socialMyRecordName.isEmpty else {
+        guard await ensureSocialRecordName() else {
             logLink("checkIncoming: skipped — myRecordName is empty")
             return
         }
@@ -124,12 +132,13 @@ extension VestigoModel {
     func removeFriend(recordID: String) {
         settings.socialConfirmedFriendIDs.removeAll { $0 == recordID }
         friends.removeAll { $0.id == recordID }
+        clearFriendsCache()
         saveSettings()
         Task { await loadFriends() }
-        guard !settings.socialMyRecordName.isEmpty else { return }
-        let myName = settings.name
-        let myRecord = settings.socialMyRecordName
         Task {
+            guard await ensureSocialRecordName() else { return }
+            let myName = settings.name
+            let myRecord = settings.socialMyRecordName
             await publicSync.sendRemovalNotice(
                 fromRecordName: myRecord,
                 fromDisplayName: myName,
@@ -139,13 +148,17 @@ extension VestigoModel {
     }
 
     func checkRemovalNotices() async {
-        guard !settings.socialMyRecordName.isEmpty else { return }
+        guard await ensureSocialRecordName() else { return }
         let (notices, _) = await publicSync.fetchRemovalNotices(myRecordName: settings.socialMyRecordName)
         var newRemovals: [String] = []
+        var processedAnyNotice = false
         for notice in notices {
             guard !settings.socialProcessedRemovalIDs.contains(notice.id) else { continue }
             settings.socialProcessedRemovalIDs.append(notice.id)
-            if settings.socialConfirmedFriendIDs.contains(notice.recordName) {
+            processedAnyNotice = true
+            let wasStoredFriend = settings.socialConfirmedFriendIDs.contains(notice.recordName)
+            let wasCachedFriend = friends.contains { $0.id == notice.recordName }
+            if wasStoredFriend || wasCachedFriend {
                 settings.socialConfirmedFriendIDs.removeAll { $0 == notice.recordName }
                 friends.removeAll { $0.id == notice.recordName }
                 newRemovals.append(notice.name)
@@ -155,7 +168,14 @@ extension VestigoModel {
             settings.socialProcessedRemovalIDs = Array(settings.socialProcessedRemovalIDs.suffix(500))
         }
         if !newRemovals.isEmpty {
+            clearFriendsCache()
+            friendDetailContext = nil
+            friendsResetToken = UUID()
+        }
+        if processedAnyNotice {
             saveSettings()
+        }
+        if !newRemovals.isEmpty {
             pendingRemovalNames.append(contentsOf: newRemovals)
         }
     }

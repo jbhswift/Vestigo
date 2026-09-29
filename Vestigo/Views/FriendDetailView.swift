@@ -129,7 +129,7 @@ struct FriendDetailPage: View {
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("You'll no longer see their profile. They won't be notified.")
+                    Text("You'll no longer see their profile, and they'll be removed from your friends list too.")
                 }
             }
         }

@@ -32,6 +32,7 @@ interface RetentionStats {
   avgOpensRetained: number | null
   topFeaturesAll: { event: string; name: string; count: number }[]
   topFeaturesRetained: { event: string; name: string; count: number }[]
+  topFeaturesNonRetained: { event: string; name: string; count: number }[]
 }
 
 interface SentryData {
@@ -232,7 +233,7 @@ function FeatureChart({ data }: { data: FeaturePoint[] }) {
   )
 }
 
-function RetentionFeatureChart({ data, label }: { data: { name: string; count: number }[]; label: string }) {
+function RetentionFeatureChart({ data, label, minHeight = 180 }: { data: { name: string; count: number }[]; label: string; minHeight?: number }) {
   const COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#ede9fe', '#e0e7ff', '#c7d2fe', '#818cf8', '#4f46e5']
   if (!data.length) return (
     <div className="h-48 flex items-center justify-center text-zinc-500 text-sm">No data yet</div>
@@ -240,7 +241,7 @@ function RetentionFeatureChart({ data, label }: { data: { name: string; count: n
   return (
     <div>
       <p className="text-sm font-medium text-zinc-400 mb-3">{label}</p>
-      <ResponsiveContainer width="100%" height={Math.max(180, data.length * 30)}>
+      <ResponsiveContainer width="100%" height={Math.max(minHeight, data.length * 30)}>
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 48, left: 4, bottom: 0 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#27272a" />
           <XAxis type="number" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
@@ -610,19 +611,33 @@ export default function Dashboard() {
             sub="among people who came back"
           />
         </div>
-        {retention && (retention.topFeaturesRetained.length > 0 || retention.topFeaturesAll.length > 0) && (
-          <div className="card grid grid-cols-1 sm:grid-cols-2 gap-6 mb-4">
-            <RetentionFeatureChart
-              data={retention.topFeaturesRetained}
-              label="Features used by returning users"
-            />
+        {retention && (
+          retention.topFeaturesRetained.length > 0 ||
+          retention.topFeaturesNonRetained.length > 0 ||
+          retention.topFeaturesAll.length > 0
+        ) && (
+          <div className="card space-y-6 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <RetentionFeatureChart
+                data={retention.topFeaturesRetained}
+                label="Features used by returning users"
+              />
+              <RetentionFeatureChart
+                data={retention.topFeaturesNonRetained}
+                label="Features used by non-returning users"
+              />
+            </div>
             <RetentionFeatureChart
               data={retention.topFeaturesAll}
               label="Features used by all users"
+              minHeight={220}
             />
           </div>
         )}
-        {retention && retention.topFeaturesRetained.length === 0 && retention.topFeaturesAll.length === 0 && (
+        {retention &&
+          retention.topFeaturesRetained.length === 0 &&
+          retention.topFeaturesNonRetained.length === 0 &&
+          retention.topFeaturesAll.length === 0 && (
           <div className="card h-32 flex items-center justify-center text-zinc-500 text-sm mb-4">
             No feature events yet — ship a build with analytics to see data
           </div>
@@ -642,9 +657,6 @@ export default function Dashboard() {
           label={`Sessions per Day (${range}d)`}
         />
       </div>
-
-      {/* Feature usage */}
-      <FeatureChart data={features} />
 
       {/* Recent Activity */}
       {!loading && (data?.recentActivity?.length ?? 0) > 0 && (

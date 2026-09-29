@@ -178,7 +178,7 @@ struct CloudPublicSyncService {
     @discardableResult
     func sendFriendRequest(fromRecordName: String, fromDisplayName: String, toRecordName: String) async -> String {
         #if canImport(CloudKit)
-        let recordName = "vfr-\(fromRecordName)-\(toRecordName)"
+        let recordName = "vfr-\(fromRecordName)-\(toRecordName)-\(UUID().uuidString)"
         let recordID = CKRecord.ID(recordName: recordName)
         let record = CKRecord(recordType: "VestigoFriendRequest", recordID: recordID)
         record["fromRecordName"] = fromRecordName as CKRecordValue
@@ -227,12 +227,13 @@ struct CloudPublicSyncService {
     @discardableResult
     func sendRemovalNotice(fromRecordName: String, fromDisplayName: String, toRecordName: String) async -> String {
         #if canImport(CloudKit)
-        let recordName = "vfrem-\(fromRecordName)-\(toRecordName)"
+        let recordName = "vfrem-\(fromRecordName)-\(toRecordName)-\(UUID().uuidString)"
         let recordID = CKRecord.ID(recordName: recordName)
         let record = CKRecord(recordType: "VestigoFriendRemoval", recordID: recordID)
         record["fromRecordName"] = fromRecordName as CKRecordValue
         record["fromDisplayName"] = fromDisplayName as CKRecordValue
         record["toRecordName"] = toRecordName as CKRecordValue
+        record["createdAt"] = Date() as CKRecordValue
         do {
             _ = try await publicDB.save(record)
             return "ok"

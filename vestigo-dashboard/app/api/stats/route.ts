@@ -8,6 +8,10 @@ const POSTHOG_HOST = process.env.POSTHOG_HOST ?? 'https://us.posthog.com'
 const PROJECT_ID = process.env.POSTHOG_PROJECT_ID!
 const PERSONAL_KEY = process.env.POSTHOG_PERSONAL_API_KEY!
 
+function sqlString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`
+}
+
 // Map raw event names to human-readable labels
 const FEATURE_LABELS: Record<string, string> = {
   tab_viewed: 'Tab Views',
@@ -150,10 +154,10 @@ export async function GET(request: NextRequest) {
   const range = Math.min(Math.max(parseInt(searchParams.get('range') ?? '30'), 7), 365)
   const distribution = searchParams.get('dist') ?? 'all' // 'all' | 'testflight' | 'appstore'
 
-  const knownDists = ['testflight', 'appstore', 'development']
-  const distFilter = knownDists.includes(distribution)
-    ? `AND properties.distribution = '${distribution}'`
+  const distFilter = distribution !== 'all'
+    ? `AND properties.distribution = ${sqlString(distribution)}`
     : ''
+  const featureEvents = Object.keys(FEATURE_LABELS).map(sqlString).join(', ')
 
   try {
     const [usersRows, sessionsRows, featureRows, summaryRows, omdbRows, recentUsersRows, recentActivityRows] = await Promise.all([
@@ -178,13 +182,7 @@ export async function GET(request: NextRequest) {
       hogql(`
         SELECT event, count() AS total
         FROM events
-        WHERE event IN (
-          'tab_viewed','pick_for_me_started','pick_for_me_completed',
-          'describe_it_used','cinema_search_used','search_performed',
-          'item_detail_viewed','item_added','item_rated','friend_added',
-          'friend_profile_viewed','collection_browsed',
-          'trailer_opened','streaming_checked','external_rating_fetched'
-        )
+        WHERE event IN (${featureEvents})
         AND timestamp >= now() - INTERVAL 30 DAY
         GROUP BY event ORDER BY total DESC
       `),
@@ -226,13 +224,7 @@ export async function GET(request: NextRequest) {
       hogql(`
         SELECT event, timestamp, distinct_id, properties.distribution AS distribution
         FROM events
-        WHERE event IN (
-          'tab_viewed','pick_for_me_started','pick_for_me_completed',
-          'describe_it_used','cinema_search_used','search_performed',
-          'item_detail_viewed','item_added','item_rated','friend_added',
-          'friend_profile_viewed','collection_browsed',
-          'trailer_opened','streaming_checked','external_rating_fetched'
-        )
+        WHERE event IN (${featureEvents})
         AND timestamp >= now() - INTERVAL ${range} DAY ${distFilter}
         ORDER BY timestamp DESC
         LIMIT 100

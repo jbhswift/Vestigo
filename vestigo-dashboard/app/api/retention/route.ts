@@ -6,6 +6,10 @@ const POSTHOG_HOST = process.env.POSTHOG_HOST ?? 'https://us.posthog.com'
 const PROJECT_ID = process.env.POSTHOG_PROJECT_ID!
 const PERSONAL_KEY = process.env.POSTHOG_PERSONAL_API_KEY!
 
+function sqlString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`
+}
+
 async function hogql(query: string): Promise<unknown[][]> {
   const res = await fetch(`${POSTHOG_HOST}/api/projects/${PROJECT_ID}/query/`, {
     method: 'POST',
@@ -42,15 +46,15 @@ export interface RetentionStats {
   avgOpensRetained: number | null
   topFeaturesAll: { event: string; name: string; count: number }[]
   topFeaturesRetained: { event: string; name: string; count: number }[]
+  topFeaturesNonRetained: { event: string; name: string; count: number }[]
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const range = Math.min(Math.max(parseInt(searchParams.get('range') ?? '30'), 7), 365)
   const dist = searchParams.get('dist') ?? 'all'
-  const knownDists = ['testflight', 'appstore', 'development']
-  const distFilter = knownDists.includes(dist) ? `AND properties.distribution = '${dist}'` : ''
-  const featureList = Object.keys(FEATURE_NAMES).map(e => `'${e}'`).join(', ')
+  const distFilter = dist !== 'all' ? `AND properties.distribution = ${sqlString(dist)}` : ''
+  const featureList = Object.keys(FEATURE_NAMES).map(sqlString).join(', ')
 
   let stats: RetentionStats = {
     totalUsers: null,
@@ -60,6 +64,7 @@ export async function GET(request: NextRequest) {
     avgOpensRetained: null,
     topFeaturesAll: [],
     topFeaturesRetained: [],
+    topFeaturesNonRetained: [],
   }
 
   const [sessionStats, allFeatures, retainedFeatures] = await Promise.allSettled([
@@ -147,6 +152,15 @@ export async function GET(request: NextRequest) {
       count: Number(count),
     }))
   }
+
+  const retainedCounts = new Map(stats.topFeaturesRetained.map((feature) => [feature.event, feature.count]))
+  stats.topFeaturesNonRetained = stats.topFeaturesAll
+    .map((feature) => ({
+      ...feature,
+      count: Math.max(0, feature.count - (retainedCounts.get(feature.event) ?? 0)),
+    }))
+    .filter((feature) => feature.count > 0)
+    .sort((a, b) => b.count - a.count)
 
   return NextResponse.json({ stats, range, updatedAt: new Date().toISOString() })
 }

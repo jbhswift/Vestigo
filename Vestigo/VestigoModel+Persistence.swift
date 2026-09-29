@@ -238,4 +238,8 @@ extension VestigoModel {
         try? data.write(to: friendsCacheURL, options: .atomic)
     }
 
+    func clearFriendsCache() {
+        try? FileManager.default.removeItem(at: friendsCacheURL)
+    }
+
 }

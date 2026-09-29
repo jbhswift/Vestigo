@@ -77,6 +77,7 @@ struct ContentView: View {
                     Label(AppTab.friends.title, systemImage: AppTab.friends.icon)
                 }
                 .tag(AppTab.friends)
+                .badge(model.pendingRemovalNames.count)
         }
         .tint(model.settings.accentColor)
         #if os(iOS)
