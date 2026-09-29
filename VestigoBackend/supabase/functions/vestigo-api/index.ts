@@ -1533,7 +1533,16 @@ async function enrichPoolWithRatings(kind: "movie" | "tv", dtos: any[]): Promise
   }))
 }
 
-Deno.serve(async (req) => {
+// Public, read-only proxy with no secrets in its responses — callable from any
+// origin (native app via URLSession, which ignores CORS entirely, and now the
+// vestigo-app.com website via browser fetch, which enforces it).
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+}
+
+async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
 
   // Count every invocation — each request to this function = 1 Supabase Edge invocation
@@ -2481,4 +2490,15 @@ Rules:
       }
     )
   }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS })
+  }
+
+  const response = await handleRequest(req)
+  const headers = new Headers(response.headers)
+  for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value)
+  return new Response(response.body, { status: response.status, headers })
 })

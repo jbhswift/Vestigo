@@ -171,7 +171,7 @@ final class VestigoModel: ObservableObject {
     }
 
     var myInviteURL: String {
-        var url = "https://jbhswift.github.io/friend?id=\(settings.socialInviteID)"
+        var url = "https://vestigo-app.com/friend?id=\(settings.socialInviteID)"
         if !settings.socialMyRecordName.isEmpty {
             url += "&rid=\(settings.socialMyRecordName)"
         }

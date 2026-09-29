@@ -178,7 +178,7 @@ extension MediaItem {
     }
 
     var shareURL: URL {
-        URL(string: "vestigo://media?id=\(id)&kind=\(kind.rawValue)")!
+        URL(string: "https://vestigo-app.com/media?id=\(id)&kind=\(kind.rawValue)")!
     }
 }
 

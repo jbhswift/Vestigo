@@ -127,11 +127,31 @@ struct ContentView: View {
         } message: {
             Text("Your personal OMDb key has made \(model.settings.omdbDailyRequestCount.formatted()) requests today and reached its daily limit. Vestigo's shared key will be used for the rest of the day — IMDb ratings will continue to load normally.")
         }
+        .alert(
+            "Friend Removed",
+            isPresented: Binding(
+                get: { !model.pendingRemovalNames.isEmpty },
+                set: { if !$0 { model.pendingRemovalNames.removeAll() } }
+            )
+        ) {
+            Button("OK") { model.pendingRemovalNames.removeAll() }
+        } message: {
+            if let name = model.pendingRemovalNames.first {
+                let others = model.pendingRemovalNames.count - 1
+                if others == 0 {
+                    Text("\(name) has removed you as a friend on Vestigo.")
+                } else {
+                    Text("\(name) and \(others) other\(others == 1 ? "" : "s") have removed you as friends on Vestigo.")
+                }
+            }
+        }
         .onOpenURL { url in
             model.logLink("onOpenURL fired: \(url.absoluteString)")
             let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
 
-            if url.scheme == "vestigo" && url.host == "media" {
+            let isCustomSchemeMedia = url.scheme == "vestigo" && url.host == "media"
+            let isUniversalLinkMedia = url.scheme == "https" && url.host == "vestigo-app.com" && url.path == "/media"
+            if isCustomSchemeMedia || isUniversalLinkMedia {
                 guard let idStr = components?.queryItems?.first(where: { $0.name == "id" })?.value,
                       let mediaID = Int(idStr)
                 else {
@@ -146,7 +166,7 @@ struct ContentView: View {
             }
 
             let isCustomScheme = url.scheme == "vestigo" && url.host == "friend"
-            let isUniversalLink = url.scheme == "https" && url.host == "jbhswift.github.io" && url.path == "/friend"
+            let isUniversalLink = url.scheme == "https" && url.host == "vestigo-app.com" && url.path == "/friend"
             guard (isCustomScheme || isUniversalLink),
                   let id = components?.queryItems?.first(where: { $0.name == "id" })?.value
             else {
@@ -162,8 +182,23 @@ struct ContentView: View {
             let rawURL = activity.webpageURL?.absoluteString ?? "nil"
             model.logLink("onContinueUserActivity fired: \(rawURL)")
             guard let url = activity.webpageURL,
-                  let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                  components.path == "/friend",
+                  let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            else {
+                model.logLink("onContinueUserActivity: guard failed (path=\(activity.webpageURL?.path ?? "nil"))")
+                return
+            }
+
+            if components.path == "/media",
+               let idStr = components.queryItems?.first(where: { $0.name == "id" })?.value,
+               let mediaID = Int(idStr) {
+                let kindStr = components.queryItems?.first(where: { $0.name == "kind" })?.value ?? "movie"
+                let kind = MediaKind(rawValue: kindStr) ?? .movie
+                model.logLink("onContinueUserActivity: media link id=\(mediaID) kind=\(kind.rawValue)")
+                Task { await model.handleMediaLink(id: mediaID, kind: kind) }
+                return
+            }
+
+            guard components.path == "/friend",
                   let id = components.queryItems?.first(where: { $0.name == "id" })?.value
             else {
                 model.logLink("onContinueUserActivity: guard failed (path=\(activity.webpageURL?.path ?? "nil"))")
@@ -176,7 +211,11 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
-                Task { await model.checkIncomingFriendRequests() }
+                Task {
+                    async let requests: Void = model.checkIncomingFriendRequests()
+                    async let removals: Void = model.checkRemovalNotices()
+                    _ = await (requests, removals)
+                }
                 // Republish profile on foreground so lastActiveAt stays fresh, throttled to 30 min
                 if Date().timeIntervalSince(model.lastProfilePublish) > 1800 {
                     Task { await model.publishPublicProfile() }

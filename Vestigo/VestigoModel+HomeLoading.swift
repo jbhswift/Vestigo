@@ -50,6 +50,12 @@ extension VestigoModel {
         Task {
             await publishPublicProfile()
         }
+
+        Task {
+            async let requests: Void = checkIncomingFriendRequests()
+            async let removals: Void = checkRemovalNotices()
+            _ = await (requests, removals)
+        }
     }
 
     func clearExternalRatingsCache() {

@@ -193,24 +193,6 @@ struct FriendsView: View {
             EmptyView()
             #endif
         }
-        .alert(
-            "Friend Removed",
-            isPresented: Binding(
-                get: { !model.pendingRemovalNames.isEmpty },
-                set: { if !$0 { model.pendingRemovalNames.removeAll() } }
-            )
-        ) {
-            Button("OK") { model.pendingRemovalNames.removeAll() }
-        } message: {
-            if let name = model.pendingRemovalNames.first {
-                let others = model.pendingRemovalNames.count - 1
-                if others == 0 {
-                    Text("\(name) has removed you as a friend on Vestigo.")
-                } else {
-                    Text("\(name) and \(others) other\(others == 1 ? "" : "s") have removed you as friends on Vestigo.")
-                }
-            }
-        }
     }
 
     private func startFriendsLoad() {

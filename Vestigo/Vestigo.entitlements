@@ -14,7 +14,7 @@
 	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:jbhswift.github.io</string>
+		<string>applinks:vestigo-app.com</string>
 	</array>
 </dict>
 </plist>

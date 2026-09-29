@@ -41,6 +41,10 @@ node_modules/
 .npm
 .yarn
 
+# vestigo-app.com is its own git repo (github.com/jbhswift/vestigo-app.com),
+# cloned here as a sibling project folder — not tracked by this repo.
+/vestigo-app.com/
+
 # ==============================
 # Secrets / environment
 # ==============================
