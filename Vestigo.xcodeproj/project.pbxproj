@@ -440,6 +440,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Vestigo/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Vestigo;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Vestigo uses calendar access to add release dates for upcoming movies and TV seasons.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Used to take a profile photo for your Vestigo Friends profile.";
@@ -484,6 +485,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Vestigo/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Vestigo;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Vestigo uses calendar access to add release dates for upcoming movies and TV seasons.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Used to take a profile photo for your Vestigo Friends profile.";
