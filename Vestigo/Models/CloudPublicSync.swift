@@ -207,6 +207,7 @@ struct CloudPublicSyncService {
             let (matchResults, _) = try await publicDB.records(matching: query)
             for (_, result) in matchResults {
                 guard let record = try? result.get() else { continue }
+                guard record.recordID.recordName.hasPrefix("vfr-") else { continue }
                 let fromName = (record["fromDisplayName"] as? String) ?? "Unknown"
                 let fromRID = (record["fromRecordName"] as? String) ?? ""
                 if !fromRID.isEmpty {
@@ -229,7 +230,7 @@ struct CloudPublicSyncService {
         #if canImport(CloudKit)
         let recordName = "vfrem-\(fromRecordName)-\(toRecordName)-\(UUID().uuidString)"
         let recordID = CKRecord.ID(recordName: recordName)
-        let record = CKRecord(recordType: "VestigoFriendRemoval", recordID: recordID)
+        let record = CKRecord(recordType: "VestigoFriendRequest", recordID: recordID)
         record["fromRecordName"] = fromRecordName as CKRecordValue
         record["fromDisplayName"] = fromDisplayName as CKRecordValue
         record["toRecordName"] = toRecordName as CKRecordValue
@@ -249,19 +250,25 @@ struct CloudPublicSyncService {
 
     func fetchRemovalNotices(myRecordName: String) async -> (results: [(id: String, name: String, recordName: String)], error: String?) {
         #if canImport(CloudKit)
-        let pred = NSPredicate(format: "toRecordName == %@", myRecordName)
-        let query = CKQuery(recordType: "VestigoFriendRemoval", predicate: pred)
         var results: [(id: String, name: String, recordName: String)] = []
-        do {
+
+        func appendRemovalResults(from query: CKQuery) async throws {
             let (matchResults, _) = try await publicDB.records(matching: query)
             for (_, result) in matchResults {
                 guard let record = try? result.get() else { continue }
+                guard record.recordID.recordName.hasPrefix("vfrem-") else { continue }
                 let fromName = (record["fromDisplayName"] as? String) ?? "Someone"
                 let fromRID = (record["fromRecordName"] as? String) ?? ""
                 if !fromRID.isEmpty {
                     results.append((id: record.recordID.recordName, name: fromName, recordName: fromRID))
                 }
             }
+        }
+
+        let pred = NSPredicate(format: "toRecordName == %@", myRecordName)
+        do {
+            try await appendRemovalResults(from: CKQuery(recordType: "VestigoFriendRequest", predicate: pred))
+            try? await appendRemovalResults(from: CKQuery(recordType: "VestigoFriendRemoval", predicate: pred))
             return (results, nil)
         } catch {
             return ([], error.localizedDescription)

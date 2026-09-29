@@ -94,7 +94,10 @@ struct ContentView: View {
             model.refreshImages()
         })
         .environment(\.isLowPowerModeActive, lowPowerMode.isEnabled)
-        .task { await model.bootstrap() }
+        .task {
+            await model.bootstrap()
+            model.startSocialPolling()
+        }
         .onChange(of: model.settings.socialMyRecordName) { _, recordName in
             guard !recordName.isEmpty else { return }
             Task { await AnalyticsService.shared.identify(cloudKitID: recordName, name: model.settings.name) }
@@ -217,10 +220,13 @@ struct ContentView: View {
                     async let removals: Void = model.checkRemovalNotices()
                     _ = await (requests, removals)
                 }
+                model.startSocialPolling()
                 // Republish profile on foreground so lastActiveAt stays fresh, throttled to 30 min
                 if Date().timeIntervalSince(model.lastProfilePublish) > 1800 {
                     Task { await model.publishPublicProfile() }
                 }
+            } else if phase == .background {
+                model.stopSocialPolling()
             }
         }
         .alert(

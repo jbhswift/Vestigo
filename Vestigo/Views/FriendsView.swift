@@ -52,6 +52,7 @@ struct FriendsView: View {
     @State private var showAddMenu = false
     @State private var showQRCode = false
     @State private var showSendLink = false
+    @State private var preparedInviteURL: String? = nil
     @State private var isPreparingInvite = false
     @AppStorage("Vestigo.devMode") private var devMode: Bool = false
 
@@ -146,7 +147,10 @@ struct FriendsView: View {
             }
 
             if showQRCode {
-                QRCodeOverlay(inviteURL: myInviteURL, onDismiss: { showQRCode = false })
+                QRCodeOverlay(inviteURL: preparedInviteURL ?? myInviteURL, onDismiss: {
+                    showQRCode = false
+                    startFriendsLoad()
+                })
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
             }
 
@@ -168,6 +172,7 @@ struct FriendsView: View {
                     try? await Task.sleep(nanoseconds: 300_000_000) // let alert finish dismissing
                     withAnimation(.easeInOut(duration: 0.22)) { isPreparingInvite = true }
                     await model.publishPublicProfile()
+                    preparedInviteURL = myInviteURL
                     withAnimation(.easeInOut(duration: 0.22)) { isPreparingInvite = false }
                     showQRCode = true
                 }
@@ -177,6 +182,7 @@ struct FriendsView: View {
                     try? await Task.sleep(nanoseconds: 300_000_000)
                     withAnimation(.easeInOut(duration: 0.22)) { isPreparingInvite = true }
                     await model.publishPublicProfile()
+                    preparedInviteURL = myInviteURL
                     withAnimation(.easeInOut(duration: 0.22)) { isPreparingInvite = false }
                     showSendLink = true
                 }
@@ -187,7 +193,8 @@ struct FriendsView: View {
         }
         .sheet(isPresented: $showSendLink) {
             #if canImport(UIKit)
-            let shareItems: [Any] = URL(string: myInviteURL).map { [$0 as Any] } ?? [myInviteURL as Any]
+            let inviteURL = preparedInviteURL ?? myInviteURL
+            let shareItems: [Any] = URL(string: inviteURL).map { [$0 as Any] } ?? [inviteURL as Any]
             ActivityView(activityItems: shareItems)
             #else
             EmptyView()
@@ -202,8 +209,9 @@ struct FriendsView: View {
 
     private func startFriendsLoadAsync() async {
         async let publish: Void = model.publishPublicProfile()
-        async let requests: Void = model.checkIncomingFriendRequests()
-        _ = await (publish, requests)
+        async let requests: Void = model.checkIncomingFriendRequests(force: true)
+        async let removals: Void = model.checkRemovalNotices()
+        _ = await (publish, requests, removals)
         await model.loadFriends()
     }
 }
@@ -246,9 +254,15 @@ private struct QRCodeOverlay: View {
                         .overlay(ProgressView())
                 }
 
-                Text("Tap anywhere to close")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Button("Done") {
+                    onDismiss()
+                }
+                .font(.subheadline.bold())
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .liquidGlass(cornerRadius: 18)
+                .buttonStyle(.plain)
             }
             .padding(32)
             .liquidGlass(cornerRadius: 32)

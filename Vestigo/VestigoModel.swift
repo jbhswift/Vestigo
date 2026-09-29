@@ -123,6 +123,7 @@ final class VestigoModel: ObservableObject {
     var saveTask: Task<Void, Never>?
     var recommendationsRefreshTask: Task<Void, Never>?
     var publishTask: Task<Void, Never>?
+    var socialPollTask: Task<Void, Never>?
     var searchRequestID = UUID()
     var isApplyingCloudSnapshot = false
     var regionServiceCatalog: [RegionStreamingService] {

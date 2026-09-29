@@ -9,7 +9,10 @@ struct FriendActivityRow: View {
     @ObservedObject var model: VestigoModel
 
     var body: some View {
-        Button { model.selectedItem = item } label: {
+        Button {
+            model.friendDetailContext = friend
+            model.selectedItem = item
+        } label: {
             HStack(spacing: 12) {
                 AvatarView(name: friend.name, imageData: friend.imageData, size: 54)
                 VStack(alignment: .leading, spacing: 2) {
@@ -218,6 +221,7 @@ struct WatchWithSection: View {
         let item: MediaItem
         let labels: [String]
         let overlapCount: Int
+        let friendContext: FriendProfile?
     }
 
     private var scoredItems: [ScoredItem] {
@@ -246,7 +250,8 @@ struct WatchWithSection: View {
                 var who: [String] = []
                 if inF1 { who.append(f1Name) }
                 if inF2 { who.append(f2Name) }
-                return ScoredItem(item: item, labels: who, overlapCount: count)
+                let friendContext = inF1 ? f1 : (inF2 ? f2 : nil)
+                return ScoredItem(item: item, labels: who, overlapCount: count, friendContext: friendContext)
             }.sorted { a, b in
                 a.overlapCount != b.overlapCount ? a.overlapCount > b.overlapCount : a.item.voteAverage > b.item.voteAverage
             }
@@ -256,23 +261,25 @@ struct WatchWithSection: View {
             let f1Name = f1.name.components(separatedBy: " ").first ?? f1.name
             return myIDs.intersection(f1IDs).compactMap { sid -> ScoredItem? in
                 guard let item = myItemsByID[sid] else { return nil }
-                return ScoredItem(item: item, labels: [f1Name], overlapCount: 2)
+                return ScoredItem(item: item, labels: [f1Name], overlapCount: 2, friendContext: f1)
             }.sorted { $0.item.voteAverage > $1.item.voteAverage }
         } else {
             // No friend selected: items on your watchlist that any sharing friend also has
             var counts: [String: Int] = [:]
             var nameMap: [String: [String]] = [:]
+            var firstFriendMap: [String: FriendProfile] = [:]
             for friend in sharingFriends {
                 let firstName = friend.name.components(separatedBy: " ").first ?? friend.name
                 let fIDs = Set(friend.watchlistItems.map { $0.key.stableID })
                 for sid in myIDs.intersection(fIDs) {
                     counts[sid, default: 0] += 1
                     nameMap[sid, default: []].append(firstName)
+                    if firstFriendMap[sid] == nil { firstFriendMap[sid] = friend }
                 }
             }
             return counts.compactMap { sid, count -> ScoredItem? in
                 guard let item = myItemsByID[sid] else { return nil }
-                return ScoredItem(item: item, labels: nameMap[sid] ?? [], overlapCount: count)
+                return ScoredItem(item: item, labels: nameMap[sid] ?? [], overlapCount: count, friendContext: firstFriendMap[sid])
             }.sorted { a, b in
                 a.overlapCount != b.overlapCount ? a.overlapCount > b.overlapCount : a.item.voteAverage > b.item.voteAverage
             }
@@ -319,7 +326,10 @@ struct WatchWithSection: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 10) {
                             ForEach(Array(scoredItems.prefix(20))) { scored in
-                                Button { model.selectedItem = scored.item } label: {
+                                Button {
+                                    model.friendDetailContext = scored.friendContext
+                                    model.selectedItem = scored.item
+                                } label: {
                                     VStack(alignment: .leading, spacing: 5) {
                                         PosterView(
                                             item: scored.item,

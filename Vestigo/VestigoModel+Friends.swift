@@ -11,8 +11,8 @@ extension VestigoModel {
         return true
     }
 
-    func checkIncomingFriendRequests() async {
-        guard Date().timeIntervalSince(lastIncomingCheck) > 60 else { return }
+    func checkIncomingFriendRequests(force: Bool = false) async {
+        guard force || Date().timeIntervalSince(lastIncomingCheck) > 5 else { return }
         lastIncomingCheck = Date()
         guard await ensureSocialRecordName() else {
             logLink("checkIncoming: skipped — myRecordName is empty")
@@ -116,16 +116,16 @@ extension VestigoModel {
         // Refresh list immediately; notify the other person in parallel
         Task { await loadFriends() }
         Task {
-            if !settings.socialMyRecordName.isEmpty {
-                let result = await publicSync.sendFriendRequest(
-                    fromRecordName: settings.socialMyRecordName,
-                    fromDisplayName: settings.name,
-                    toRecordName: recordID
-                )
-                logLink("addFriend: sendFriendRequest → \(result)")
-            } else {
+            guard await ensureSocialRecordName() else {
                 logLink("addFriend: skipped sendFriendRequest — myRecordName empty")
+                return
             }
+            let result = await publicSync.sendFriendRequest(
+                fromRecordName: settings.socialMyRecordName,
+                fromDisplayName: settings.name,
+                toRecordName: recordID
+            )
+            logLink("addFriend: sendFriendRequest → \(result)")
         }
     }
 
@@ -139,17 +139,25 @@ extension VestigoModel {
             guard await ensureSocialRecordName() else { return }
             let myName = settings.name
             let myRecord = settings.socialMyRecordName
-            await publicSync.sendRemovalNotice(
+            let result = await publicSync.sendRemovalNotice(
                 fromRecordName: myRecord,
                 fromDisplayName: myName,
                 toRecordName: recordID
             )
+            logLink("removeFriend: sendRemovalNotice → \(result)")
         }
     }
 
     func checkRemovalNotices() async {
         guard await ensureSocialRecordName() else { return }
-        let (notices, _) = await publicSync.fetchRemovalNotices(myRecordName: settings.socialMyRecordName)
+        let myRIDSuffix = String(settings.socialMyRecordName.suffix(8))
+        logLink("checkRemoval: querying for myRID=…\(myRIDSuffix)")
+        let (notices, fetchError) = await publicSync.fetchRemovalNotices(myRecordName: settings.socialMyRecordName)
+        if let fetchError {
+            logLink("checkRemoval: fetch error — \(fetchError)")
+            return
+        }
+        logLink("checkRemoval: found \(notices.count) notice(s)")
         var newRemovals: [String] = []
         var processedAnyNotice = false
         for notice in notices {
@@ -178,6 +186,24 @@ extension VestigoModel {
         if !newRemovals.isEmpty {
             pendingRemovalNames.append(contentsOf: newRemovals)
         }
+    }
+
+    func startSocialPolling() {
+        socialPollTask?.cancel()
+        socialPollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 60_000_000_000)
+                guard !Task.isCancelled, let self else { return }
+                async let requests: Void = self.checkIncomingFriendRequests()
+                async let removals: Void = self.checkRemovalNotices()
+                _ = await (requests, removals)
+            }
+        }
+    }
+
+    func stopSocialPolling() {
+        socialPollTask?.cancel()
+        socialPollTask = nil
     }
 
     func refreshFriend(recordID: String) async -> FriendProfile? {
