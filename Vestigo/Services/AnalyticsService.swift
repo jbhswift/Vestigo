@@ -201,14 +201,14 @@ final class AnalyticsService: @unchecked Sendable {
         }
     }
 
-    func identify(cloudKitID: String, name: String) async {
-        guard !cloudKitID.isEmpty else { return }
+    func identify(deviceID: String, name: String) async {
+        guard !deviceID.isEmpty else { return }
         let distribution = await resolveDistribution()
-        PostHogSDK.shared.identify(cloudKitID, userProperties: [
+        PostHogSDK.shared.identify(deviceID, userProperties: [
             "name": name.isEmpty ? "Unknown" : name,
             "distribution": distribution,
         ])
-        let sentryUser = User(userId: cloudKitID)
+        let sentryUser = User(userId: deviceID)
         sentryUser.username = name.isEmpty ? nil : name
         SentrySDK.setUser(sentryUser)
     }

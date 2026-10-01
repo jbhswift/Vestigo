@@ -26,7 +26,7 @@ struct FriendProfile: Identifiable, Hashable, Codable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: FriendProfile, rhs: FriendProfile) -> Bool { lhs.id == rhs.id }
 
-    /// watchedItems already arrives ordered most-recent-first (CloudPublicSyncService sorts by
+    /// watchedItems already arrives ordered most-recent-first (the backend push sorts by
     /// watch order, not watchedDates, since dates are opt-in and often missing).
     var mostRecentlyWatchedItem: MediaItem? {
         watchedItems.first
@@ -55,8 +55,6 @@ struct FriendsView: View {
     @State private var preparedInviteURL: String? = nil
     @State private var isPreparingInvite = false
     @AppStorage("Vestigo.devMode") private var devMode: Bool = false
-
-    private var myInviteURL: String { model.myInviteURL }
 
     var body: some View {
         ZStack {
@@ -146,8 +144,8 @@ struct FriendsView: View {
                 }
             }
 
-            if showQRCode {
-                QRCodeOverlay(inviteURL: preparedInviteURL ?? myInviteURL, onDismiss: {
+            if showQRCode, let preparedInviteURL {
+                QRCodeOverlay(inviteURL: preparedInviteURL, onDismiss: {
                     showQRCode = false
                     startFriendsLoad()
                 })
@@ -165,26 +163,26 @@ struct FriendsView: View {
                     .transition(.opacity)
             }
         }
-        .task { await startFriendsLoadAsync() }
+        .task { await model.loadFriends() }
         .alert("Add a Friend", isPresented: $showAddMenu) {
             Button("QR Code") {
                 Task {
                     try? await Task.sleep(nanoseconds: 300_000_000) // let alert finish dismissing
                     withAnimation(.easeInOut(duration: 0.22)) { isPreparingInvite = true }
-                    await model.publishPublicProfile()
-                    preparedInviteURL = myInviteURL
+                    let url = await model.createInviteURL()
+                    preparedInviteURL = url
                     withAnimation(.easeInOut(duration: 0.22)) { isPreparingInvite = false }
-                    showQRCode = true
+                    if url != nil { showQRCode = true }
                 }
             }
             Button("Send Link") {
                 Task {
                     try? await Task.sleep(nanoseconds: 300_000_000)
                     withAnimation(.easeInOut(duration: 0.22)) { isPreparingInvite = true }
-                    await model.publishPublicProfile()
-                    preparedInviteURL = myInviteURL
+                    let url = await model.createInviteURL()
+                    preparedInviteURL = url
                     withAnimation(.easeInOut(duration: 0.22)) { isPreparingInvite = false }
-                    showSendLink = true
+                    if url != nil { showSendLink = true }
                 }
             }
             Button("Cancel", role: .cancel) {}
@@ -193,9 +191,10 @@ struct FriendsView: View {
         }
         .sheet(isPresented: $showSendLink) {
             #if canImport(UIKit)
-            let inviteURL = preparedInviteURL ?? myInviteURL
-            let shareItems: [Any] = URL(string: inviteURL).map { [$0 as Any] } ?? [inviteURL as Any]
-            ActivityView(activityItems: shareItems)
+            if let inviteURL = preparedInviteURL {
+                let shareItems: [Any] = URL(string: inviteURL).map { [$0 as Any] } ?? [inviteURL as Any]
+                ActivityView(activityItems: shareItems)
+            }
             #else
             EmptyView()
             #endif
@@ -204,15 +203,7 @@ struct FriendsView: View {
 
     private func startFriendsLoad() {
         loadTask?.cancel()
-        loadTask = Task { await startFriendsLoadAsync() }
-    }
-
-    private func startFriendsLoadAsync() async {
-        async let publish: Void = model.publishPublicProfile()
-        async let requests: Void = model.checkIncomingFriendRequests(force: true)
-        async let removals: Void = model.checkRemovalNotices()
-        _ = await (publish, requests, removals)
-        await model.loadFriends()
+        loadTask = Task { await model.loadFriends() }
     }
 }
 

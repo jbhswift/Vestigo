@@ -1,0 +1,84 @@
+DEFINE SCHEMA
+
+    RECORD TYPE Users (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        roles           LIST<INT64>,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE VestigoFriendRemoval (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        toRecordName    STRING QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE VestigoFriendRequest (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        createdAt       TIMESTAMP,
+        fromDisplayName STRING,
+        fromRecordName  STRING,
+        toRecordName    STRING QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE VestigoPublicProfile (
+        "___createTime"          TIMESTAMP,
+        "___createdBy"           REFERENCE,
+        "___etag"                STRING,
+        "___modTime"             TIMESTAMP,
+        "___modifiedBy"          REFERENCE,
+        "___recordID"            REFERENCE QUERYABLE,
+        avatarPayload            ASSET,
+        currentlyWatchingPayload ASSET,
+        displayName              STRING,
+        emailHashes              LIST<STRING> QUERYABLE,
+        excitedForPayload        ASSET,
+        favouriteKeys            LIST<STRING>,
+        featuredPayload          ASSET,
+        inviteID                 STRING QUERYABLE,
+        lastActiveAt             TIMESTAMP,
+        phoneHashes              LIST<STRING> QUERYABLE,
+        ratingsPayload           ASSET,
+        sharesWatched            INT64,
+        sharesWatchlist          INT64,
+        watchedDatesPayload      ASSET,
+        watchedPayload           ASSET,
+        watchlistPayload         ASSET,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE VestigoUserSnapshot (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        modifiedAt      TIMESTAMP QUERYABLE SORTABLE,
+        payload         ASSET,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );

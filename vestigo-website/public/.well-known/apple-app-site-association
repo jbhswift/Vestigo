@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["H5YGR6U5A4.com.jojovestigo"],
+        "components": [
+          { "/": "/friend*" },
+          { "/": "/media*" }
+        ]
+      }
+    ]
+  }
+}

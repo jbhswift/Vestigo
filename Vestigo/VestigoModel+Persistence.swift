@@ -102,7 +102,7 @@ extension VestigoModel {
 
     func saveSettings() {
         saveLocalSoon()
-        schedulePublicProfilePublish()
+        scheduleBackendLibraryPush()
     }
 
     func loadStreamingServiceCatalog() async {
@@ -153,43 +153,6 @@ extension VestigoModel {
         regionServiceCatalogsByRegion = [:]
         tmdbProvidersByRegion = [:]
         tmdbGlobalProviders = []
-    }
-
-    func schedulePublicProfilePublish() {
-        publishTask?.cancel()
-        publishTask = Task { [weak self] in
-            // Watching/watchlisting something is often immediately followed by backgrounding
-            // the app. Without a task assertion, iOS can suspend the process mid-debounce or
-            // mid-upload, silently dropping the publish so lastActiveAt never reaches the server.
-            #if canImport(UIKit)
-            let bgTaskID = await MainActor.run { UIApplication.shared.beginBackgroundTask(withName: "PublishFriendProfile") }
-            defer {
-                Task { @MainActor in
-                    guard bgTaskID != .invalid else { return }
-                    UIApplication.shared.endBackgroundTask(bgTaskID)
-                }
-            }
-            #endif
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            guard !Task.isCancelled, let self else { return }
-            let result = await self.publicSync.publishProfile(settings: self.settings, library: self.library, avatarData: self.userAvatarData)
-            await MainActor.run {
-                self.publishDiagnostic = result
-                self.lastProfilePublish = Date()
-            }
-        }
-    }
-
-    func publishPublicProfile() async {
-        // Get record name first (fast, cached CloudKit user ID) so myInviteURL
-        // has &rid= before the slow CKRecord upload begins.
-        if let myRecord = await publicSync.getMyRecordName(), settings.socialMyRecordName != myRecord {
-            settings.socialMyRecordName = myRecord
-            saveSettings()
-        }
-        let diagnostic = await publicSync.publishProfile(settings: settings, library: library, avatarData: userAvatarData)
-        publishDiagnostic = diagnostic
-        lastProfilePublish = Date()
     }
 
     func saveLocalSoon() {

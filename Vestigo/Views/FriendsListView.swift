@@ -76,7 +76,7 @@ struct FriendsListView: View {
             set: { if !$0 { friendToRemove = nil } }
         )) {
             Button("Remove", role: .destructive) {
-                if let f = friendToRemove { model.removeFriend(recordID: f.id) }
+                if let f = friendToRemove { model.removeFriend(friendID: f.id) }
                 friendToRemove = nil
             }
             Button("Cancel", role: .cancel) { friendToRemove = nil }

@@ -10,7 +10,7 @@ extension VestigoModel {
             AnalyticsService.shared.track(.itemAdded(mediaType: item.kind.rawValue, action: "watchlist"))
         }
         saveLocalSoon()
-        schedulePublicProfilePublish()
+        scheduleBackendLibraryPush()
     }
 
     func toggleWatched(_ item: MediaItem, showsRatingPrompt: Bool = true) {
@@ -56,7 +56,7 @@ extension VestigoModel {
             generateDynamicCollections(from: item)
         }
         saveLocalSoon()
-        schedulePublicProfilePublish()
+        scheduleBackendLibraryPush()
 
         if isNowWatched {
             let cachedCollectionIDs = Array(collectionRecommendations.keys)
@@ -238,7 +238,7 @@ extension VestigoModel {
     func saveUserAvatar(_ data: Data) {
         userAvatarData = data
         try? data.write(to: avatarFileURL, options: .atomic)
-        schedulePublicProfilePublish()
+        scheduleBackendLibraryPush()
     }
 
     #if canImport(UIKit)
@@ -262,7 +262,7 @@ extension VestigoModel {
     func clearUserAvatar() {
         userAvatarData = nil
         try? FileManager.default.removeItem(at: avatarFileURL)
-        schedulePublicProfilePublish()
+        scheduleBackendLibraryPush()
     }
 
     func recordRecentlyViewed(_ item: MediaItem) {

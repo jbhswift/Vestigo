@@ -17,7 +17,7 @@ struct FriendDetailPage: View {
 
     private func refresh() {
         Task {
-            if let updated = await model.refreshFriend(recordID: friend.id) { liveData = updated }
+            if let updated = await model.refreshFriend(friendID: friend.id) { liveData = updated }
         }
     }
 
@@ -124,7 +124,7 @@ struct FriendDetailPage: View {
                 .buttonStyle(.plain)
                 .alert("Remove \(current.name)?", isPresented: $showRemoveConfirm) {
                     Button("Remove", role: .destructive) {
-                        model.removeFriend(recordID: friend.id)
+                        model.removeFriend(friendID: friend.id)
                         dismiss()
                     }
                     Button("Cancel", role: .cancel) {}
@@ -148,7 +148,7 @@ struct FriendWatchlistPage: View {
 
     private func refresh() {
         Task {
-            if let updated = await model.refreshFriend(recordID: friend.id) { liveData = updated }
+            if let updated = await model.refreshFriend(friendID: friend.id) { liveData = updated }
         }
     }
 
@@ -199,7 +199,7 @@ struct FriendWatchedPage: View {
 
     private func refresh() {
         Task {
-            if let updated = await model.refreshFriend(recordID: friend.id) { liveData = updated }
+            if let updated = await model.refreshFriend(friendID: friend.id) { liveData = updated }
         }
     }
 

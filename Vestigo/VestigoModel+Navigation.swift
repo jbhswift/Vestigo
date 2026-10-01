@@ -10,11 +10,13 @@ extension VestigoModel {
             return
         }
 
+        let previousTab = selectedTab
         tabTransitionDirection = tab.sortIndex > selectedTab.sortIndex ? .forward : .backward
         selectedTab = tab
 
         if tab == .friends {
             Task { await loadFriends() }
+            ensureSupabaseSession(previousTab: previousTab)
         }
     }
 

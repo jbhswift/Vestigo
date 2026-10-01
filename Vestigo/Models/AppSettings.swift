@@ -42,11 +42,9 @@ struct AppSettings: Codable, Hashable {
     var socialDontShare: Bool = true
     var socialFeaturedItemKeys: [String] = []
     var socialExcitedForKeys: [String] = []
-    var socialInviteID: String = UUID().uuidString
-    var socialConfirmedFriendIDs: [String] = []
-    var socialProcessedRequestIDs: [String] = []
-    var socialProcessedRemovalIDs: [String] = []
-    var socialMyRecordName: String = ""
+    /// Stable per-install identity for analytics (PostHog), independent of any
+    /// Friends/Supabase sign-in — every user gets one, not just those who use Friends.
+    var analyticsDeviceID: String = UUID().uuidString
     var recommendationCarouselOrder: [RecommendationCarousel] = RecommendationCarousel.allCases
     var recommendationCarouselHidden: Set<RecommendationCarousel> = [.moreLikeLast, .moreLikeFavourite, .watchlistPicks, .seriesNext]
     var homeDisplayCarouselOrder: [HomeDisplayCarousel] = [.trending, .forYou, .moreLikeLast, .moreLikeFavourite, .watchlistPicks, .seriesNext, .newReleases, .upcoming]
@@ -120,11 +118,7 @@ struct AppSettings: Codable, Hashable {
         case socialDontShare
         case socialFeaturedItemKeys
         case socialExcitedForKeys
-        case socialInviteID
-        case socialConfirmedFriendIDs
-        case socialProcessedRequestIDs
-        case socialProcessedRemovalIDs
-        case socialMyRecordName
+        case analyticsDeviceID
         case recentlyViewedItems
         case socialExcitedForItemCache
         case ratingSourceIMDbDefaultApplied
@@ -216,12 +210,8 @@ struct AppSettings: Codable, Hashable {
         socialDontShare = try container.decodeIfPresent(Bool.self, forKey: .socialDontShare) ?? socialDontShare
         socialFeaturedItemKeys = try container.decodeIfPresent([String].self, forKey: .socialFeaturedItemKeys) ?? socialFeaturedItemKeys
         socialExcitedForKeys = try container.decodeIfPresent([String].self, forKey: .socialExcitedForKeys) ?? socialExcitedForKeys
-        let storedInviteID = try container.decodeIfPresent(String.self, forKey: .socialInviteID) ?? ""
-        socialInviteID = storedInviteID.isEmpty ? UUID().uuidString : storedInviteID
-        socialConfirmedFriendIDs = try container.decodeIfPresent([String].self, forKey: .socialConfirmedFriendIDs) ?? socialConfirmedFriendIDs
-        socialProcessedRequestIDs = try container.decodeIfPresent([String].self, forKey: .socialProcessedRequestIDs) ?? socialProcessedRequestIDs
-        socialProcessedRemovalIDs = try container.decodeIfPresent([String].self, forKey: .socialProcessedRemovalIDs) ?? socialProcessedRemovalIDs
-        socialMyRecordName = try container.decodeIfPresent(String.self, forKey: .socialMyRecordName) ?? socialMyRecordName
+        let storedDeviceID = try container.decodeIfPresent(String.self, forKey: .analyticsDeviceID) ?? ""
+        analyticsDeviceID = storedDeviceID.isEmpty ? UUID().uuidString : storedDeviceID
         recentlyViewedItems = try container.decodeIfPresent([MediaItem].self, forKey: .recentlyViewedItems) ?? recentlyViewedItems
         socialExcitedForItemCache = try container.decodeIfPresent([MediaItem].self, forKey: .socialExcitedForItemCache) ?? socialExcitedForItemCache
     }

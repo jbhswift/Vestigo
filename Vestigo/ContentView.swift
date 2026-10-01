@@ -26,7 +26,6 @@ struct ContentView: View {
     @StateObject private var model = VestigoModel()
     @State private var lowPowerMode = LowPowerModeMonitor()
     @Namespace private var tabNamespace
-    @Environment(\.scenePhase) private var scenePhase
 
     private var selectedTabBinding: Binding<AppTab> {
         Binding(
@@ -77,7 +76,6 @@ struct ContentView: View {
                     Label(AppTab.friends.title, systemImage: AppTab.friends.icon)
                 }
                 .tag(AppTab.friends)
-                .badge(model.pendingRemovalNames.count)
         }
         .tint(model.settings.accentColor)
         #if os(iOS)
@@ -96,11 +94,6 @@ struct ContentView: View {
         .environment(\.isLowPowerModeActive, lowPowerMode.isEnabled)
         .task {
             await model.bootstrap()
-            model.startSocialPolling()
-        }
-        .onChange(of: model.settings.socialMyRecordName) { _, recordName in
-            guard !recordName.isEmpty else { return }
-            Task { await AnalyticsService.shared.identify(cloudKitID: recordName, name: model.settings.name) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .vestigoShortcut)) { notification in
             if let type = notification.object as? String {
@@ -124,30 +117,30 @@ struct ContentView: View {
         )) {
             StreamingServicesSetupSheet(model: model, isOnboarding: true)
         }
+        .alert("Sign in to use Friends", isPresented: $model.showSignInWithApple) {
+            Button("Cancel", role: .cancel) {
+                model.handleSignInWithAppleDismissed()
+            }
+            Button("Sign In") {
+                model.beginAppleSignIn()
+            }
+        } message: {
+            Text("Sign in with Apple keeps friend invitations and sharing secure. This isn't a username/password account, and it's only used for Friends.")
+        }
+        .alert("Sign In Failed", isPresented: Binding(
+            get: { model.signInErrorMessage != nil },
+            set: { if !$0 { model.signInErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(model.signInErrorMessage ?? "")
+        }
         .favouriteReplacementOverlay(model: model)
         .ratingPromptOverlay(model: model)
         .alert("Personal OMDb Key Limit Reached", isPresented: $model.showOMDbLimitAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Your personal OMDb key has made \(model.settings.omdbDailyRequestCount.formatted()) requests today and reached its daily limit. Vestigo's shared key will be used for the rest of the day — IMDb ratings will continue to load normally.")
-        }
-        .alert(
-            "Friend Removed",
-            isPresented: Binding(
-                get: { !model.pendingRemovalNames.isEmpty },
-                set: { if !$0 { model.pendingRemovalNames.removeAll() } }
-            )
-        ) {
-            Button("OK") { model.pendingRemovalNames.removeAll() }
-        } message: {
-            if let name = model.pendingRemovalNames.first {
-                let others = model.pendingRemovalNames.count - 1
-                if others == 0 {
-                    Text("\(name) has removed you as a friend on Vestigo.")
-                } else {
-                    Text("\(name) and \(others) other\(others == 1 ? "" : "s") have removed you as friends on Vestigo.")
-                }
-            }
         }
         .onOpenURL { url in
             model.logLink("onOpenURL fired: \(url.absoluteString)")
@@ -172,15 +165,13 @@ struct ContentView: View {
             let isCustomScheme = url.scheme == "vestigo" && url.host == "friend"
             let isUniversalLink = url.scheme == "https" && url.host == "vestigo-app.com" && url.path == "/friend"
             guard (isCustomScheme || isUniversalLink),
-                  let id = components?.queryItems?.first(where: { $0.name == "id" })?.value
+                  let token = components?.queryItems?.first(where: { $0.name == "t" })?.value
             else {
                 model.logLink("onOpenURL: no match (scheme=\(url.scheme ?? "nil") host=\(url.host ?? "nil") path=\(url.path))")
                 return
             }
-            let rid = components?.queryItems?.first(where: { $0.name == "rid" })?.value
-            let name = components?.queryItems?.first(where: { $0.name == "name" })?.value
-            model.logLink("onOpenURL: matched id=\(id) rid=\(rid ?? "nil") name=\(name ?? "nil")")
-            Task { await model.handleFriendLink(inviteID: id, recordID: rid, displayName: name) }
+            model.logLink("onOpenURL: matched invite token")
+            Task { await model.handleFriendInviteLink(token: token) }
         }
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             let rawURL = activity.webpageURL?.absoluteString ?? "nil"
@@ -203,31 +194,13 @@ struct ContentView: View {
             }
 
             guard components.path == "/friend",
-                  let id = components.queryItems?.first(where: { $0.name == "id" })?.value
+                  let token = components.queryItems?.first(where: { $0.name == "t" })?.value
             else {
                 model.logLink("onContinueUserActivity: guard failed (path=\(activity.webpageURL?.path ?? "nil"))")
                 return
             }
-            let rid = components.queryItems?.first(where: { $0.name == "rid" })?.value
-            let name = components.queryItems?.first(where: { $0.name == "name" })?.value
-            model.logLink("onContinueUserActivity: id=\(id) rid=\(rid ?? "nil") name=\(name ?? "nil")")
-            Task { await model.handleFriendLink(inviteID: id, recordID: rid, displayName: name) }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                Task {
-                    async let requests: Void = model.checkIncomingFriendRequests()
-                    async let removals: Void = model.checkRemovalNotices()
-                    _ = await (requests, removals)
-                }
-                model.startSocialPolling()
-                // Republish profile on foreground so lastActiveAt stays fresh, throttled to 30 min
-                if Date().timeIntervalSince(model.lastProfilePublish) > 1800 {
-                    Task { await model.publishPublicProfile() }
-                }
-            } else if phase == .background {
-                model.stopSocialPolling()
-            }
+            model.logLink("onContinueUserActivity: matched invite token")
+            Task { await model.handleFriendInviteLink(token: token) }
         }
         .alert(
             "Add Friend",
@@ -235,7 +208,7 @@ struct ContentView: View {
         ) {
             Button("Add") {
                 if let pending = model.pendingFriendAdd {
-                    model.addFriend(recordID: pending.id)
+                    model.acceptFriendInvite(token: pending.id)
                 }
             }
             Button("Cancel", role: .cancel) { model.pendingFriendAdd = nil }

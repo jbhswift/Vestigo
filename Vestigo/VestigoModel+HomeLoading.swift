@@ -33,29 +33,12 @@ extension VestigoModel {
 
         await loadHome()
 
-        // Resolve CloudKit record name eagerly so myInviteURL always includes &rid=
-        // before the user can open the QR sheet or share a link.
-        if settings.socialMyRecordName.isEmpty {
-            if let myRecord = await publicSync.getMyRecordName() {
-                settings.socialMyRecordName = myRecord
-                saveSettings()
-            }
-        }
-
         Task {
             await syncFromCloudOnLaunch()
             await loadHome()
         }
 
-        Task {
-            await publishPublicProfile()
-        }
-
-        Task {
-            async let requests: Void = checkIncomingFriendRequests()
-            async let removals: Void = checkRemovalNotices()
-            _ = await (requests, removals)
-        }
+        Task { await AnalyticsService.shared.identify(deviceID: settings.analyticsDeviceID, name: settings.name) }
     }
 
     func clearExternalRatingsCache() {

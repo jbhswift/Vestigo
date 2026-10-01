@@ -98,13 +98,17 @@ final class VestigoModel: ObservableObject {
     @Published var friends: [FriendProfile] = []
     @Published var friendsLoading = false
     @Published var friendsDiagnostic: String = ""
-    @Published var publishDiagnostic: String = ""
     @Published var pendingFriendAdd: PendingFriendAdd? = nil
-    @Published var pendingRemovalNames: [String] = []
     @Published var userAvatarData: Data? = nil
     @Published var linkLog: [String] = []
-    var lastIncomingCheck: Date = .distantPast
-    var lastProfilePublish: Date = .distantPast
+    @Published var showSignInWithApple = false
+    @Published var signInErrorMessage: String?
+    @Published var tabBeforeSignInPrompt: AppTab = .home
+    @Published var isSupabaseSignedIn = false
+    @Published var isDeletingAccount = false
+    @Published var deleteAccountErrorMessage: String?
+    var returnToPreviousTabOnSignInCancel = false
+    var pendingSignInNonce: String?
 
     let tmdb = TMDbService()
     // TasteDive is intentionally disabled because the current recommendation system no longer calls it.
@@ -115,15 +119,16 @@ final class VestigoModel: ObservableObject {
     let relatedMedia = RelatedMediaService()
     let backend = VestigoBackendClient()
     let releaseCalendar = ReleaseCalendarService()
-    let publicSync = CloudPublicSyncService()
+    let supabaseAuth = SupabaseAuthClient()
+    let appleSignInCoordinator = AppleSignInCoordinator()
+    lazy var rpc = SupabaseRPCClient(auth: supabaseAuth)
     let externalRatingBatchLimit = 8
     var externalRatingEmptyRefreshes: Set<MediaKey> = []
     var externalRatingInFlight: Set<MediaKey> = []
     var searchTask: Task<Void, Never>?
     var saveTask: Task<Void, Never>?
     var recommendationsRefreshTask: Task<Void, Never>?
-    var publishTask: Task<Void, Never>?
-    var socialPollTask: Task<Void, Never>?
+    var backendPushTask: Task<Void, Never>?
     var searchRequestID = UUID()
     var isApplyingCloudSnapshot = false
     var regionServiceCatalog: [RegionStreamingService] {
@@ -169,17 +174,6 @@ final class VestigoModel: ObservableObject {
         let entry = "[\(formatter.string(from: Date()))] \(message)"
         linkLog.append(entry)
         if linkLog.count > 30 { linkLog.removeFirst() }
-    }
-
-    var myInviteURL: String {
-        var url = "https://vestigo-app.com/friend?id=\(settings.socialInviteID)"
-        if !settings.socialMyRecordName.isEmpty {
-            url += "&rid=\(settings.socialMyRecordName)"
-        }
-        if !settings.name.isEmpty, let encoded = settings.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-            url += "&name=\(encoded)"
-        }
-        return url
     }
 
     struct HomeSectionLoadResult {

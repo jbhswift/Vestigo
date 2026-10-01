@@ -6,6 +6,7 @@ struct SettingsDataSection: View {
     @ObservedObject var model: VestigoModel
     @State private var clearPresses = 0
     @State private var showClearConfirm = false
+    @State private var showDeleteAccountConfirm = false
     @State private var importText = ""
     @State private var importNotFound: [String] = []
     @State private var showImportNotFoundAlert = false
@@ -234,6 +235,16 @@ struct SettingsDataSection: View {
             .foregroundStyle(.red)
             .frame(maxWidth: .infinity, alignment: .leading)
             .settingBubble()
+
+            if model.isSupabaseSignedIn {
+                Button(model.isDeletingAccount ? "Deleting…" : "Delete my Vestigo account") {
+                    showDeleteAccountConfirm = true
+                }
+                .disabled(model.isDeletingAccount)
+                .foregroundStyle(.red)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .settingBubble()
+            }
         }
         .task {
             while !Task.isCancelled {
@@ -250,6 +261,22 @@ struct SettingsDataSection: View {
             }
         } message: {
             Text("This removes watched items, ratings, watchlist, collections, episode progress, and settings from local storage.")
+        }
+        .alert("Delete your Vestigo account?", isPresented: $showDeleteAccountConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                Task { await model.deleteSupabaseAccount() }
+            }
+        } message: {
+            Text("This permanently deletes your Vestigo Friends profile, friendships, and shared activity. It doesn't affect your personal movie library on this device.")
+        }
+        .alert("Couldn't delete account", isPresented: Binding(
+            get: { model.deleteAccountErrorMessage != nil },
+            set: { if !$0 { model.deleteAccountErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.deleteAccountErrorMessage ?? "")
         }
         .alert("Some items couldn't be imported", isPresented: $showImportNotFoundAlert) {
             Button("OK", role: .cancel) { }

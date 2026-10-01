@@ -96,7 +96,6 @@ struct MeSectionView: View {
                         .onSubmit {
                             model.settings.name = nameEdit
                             model.saveSettings()
-                            Task { await model.publishPublicProfile() }
                         }
                         .onChange(of: nameEdit) { _, newValue in
                             model.settings.name = newValue
@@ -144,6 +143,18 @@ struct MeSectionView: View {
                 )
             }
 
+            if !model.isSupabaseSignedIn {
+                Button {
+                    model.presentSignInWithApple()
+                } label: {
+                    Text("Sign in with Apple to share your activity or see friends' updates.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .buttonStyle(.plain)
+            }
+
             VStack(spacing: 0) {
                 SharingRow(
                     label: "Don't share anything",
@@ -189,8 +200,8 @@ struct MeSectionView: View {
                 }
             }
 
-            if devMode && !model.publishDiagnostic.isEmpty {
-                Text(model.publishDiagnostic)
+            if devMode && !model.friendsDiagnostic.isEmpty {
+                Text(model.friendsDiagnostic)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
