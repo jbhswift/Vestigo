@@ -66,6 +66,16 @@ extension VestigoModel {
                 signInErrorMessage = "Apple didn't return a usable credential."
                 return
             }
+            // One-time convenience: Apple only includes fullName on the very first
+            // authorization ever, so this only ever fires once — never overwrites a name
+            // the user already set, and remains fully editable afterward either way.
+            if settings.name.isEmpty, let fullName = credential.fullName {
+                let formatted = PersonNameComponentsFormatter.localizedString(from: fullName, style: .default)
+                if !formatted.isEmpty {
+                    settings.name = formatted
+                    saveSettings()
+                }
+            }
             Task {
                 do {
                     try await completeSupabaseSignIn(idToken: idToken, rawNonce: nonce)
@@ -94,6 +104,17 @@ extension VestigoModel {
             isSupabaseSignedIn = false
             friends = []
             clearFriendsCache()
+            // Reset local sharing state back to safe defaults (sharing OFF) — otherwise
+            // signing in again would immediately re-push these old preferences to the
+            // brand-new account on the next settings save, silently resurrecting the very
+            // social configuration that was just deleted.
+            let defaults = AppSettings()
+            settings.socialShareWatchlist = defaults.socialShareWatchlist
+            settings.socialShareWatched = defaults.socialShareWatched
+            settings.socialDontShare = defaults.socialDontShare
+            settings.socialFeaturedItemKeys = defaults.socialFeaturedItemKeys
+            settings.socialExcitedForKeys = defaults.socialExcitedForKeys
+            saveLocalSoon()
         } catch {
             deleteAccountErrorMessage = error.localizedDescription
         }

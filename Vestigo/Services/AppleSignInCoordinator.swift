@@ -15,10 +15,13 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
     func signIn(nonce: String) {
         let provider = ASAuthorizationAppleIDProvider()
         let request = provider.createRequest()
-        // Deliberately not requesting .email or .fullName: Apple only ever sends either
-        // on the very first authorization (never again on later sign-ins, reinstalls, or
-        // token refreshes), and Vestigo doesn't use either — the display name shown to
-        // friends comes from the app's own existing `settings.name`, synced separately.
+        // Deliberately not requesting .email: Vestigo never uses it, and Apple only ever
+        // sends it on the very first authorization anyway. .fullName IS requested as a
+        // one-time convenience to prefill `settings.name` when it's still empty — but since
+        // Apple only ever provides it on that first authorization (never on later sign-ins,
+        // reinstalls, or token refreshes), this can't be relied on as a sync mechanism; the
+        // display name shown to friends is still sourced from `settings.name` itself.
+        request.requestedScopes = [.fullName]
         request.nonce = SupabaseAuthClient.sha256Hex(nonce)
 
         let controller = ASAuthorizationController(authorizationRequests: [request])

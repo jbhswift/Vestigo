@@ -9,6 +9,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Supabase is retiring the legacy service_role JWT in favor of the
+// independently-revocable secret key (SUPABASE_SECRET_KEYS, JSON-encoded,
+// keyed by key name — "default" here). Reads the new key first; falls back
+// to the legacy env var only if the new one isn't present yet, so this keeps
+// working across the legacy-key disable step.
+function resolveSecretKey(): string {
+  const raw = Deno.env.get('SUPABASE_SECRET_KEYS')
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed.default) return parsed.default
+    } catch { /* fall through to legacy */ }
+  }
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -38,7 +54,7 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    resolveSecretKey(),
   )
 
   const { error } = await supabase

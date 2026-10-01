@@ -237,12 +237,20 @@ struct SettingsDataSection: View {
             .settingBubble()
 
             if model.isSupabaseSignedIn {
-                Button(model.isDeletingAccount ? "Deleting…" : "Delete my Vestigo account") {
-                    showDeleteAccountConfirm = true
+                VStack(alignment: .leading, spacing: 4) {
+                    Button(model.isDeletingAccount ? "Deleting…" : "Delete my Vestigo account") {
+                        showDeleteAccountConfirm = true
+                    }
+                    .disabled(model.isDeletingAccount)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text("Only your Friends identity — profile, friendships, and shared activity. Your watched history, ratings, and watchlist on this device are separate and untouched.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .disabled(model.isDeletingAccount)
-                .foregroundStyle(.red)
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .settingBubble()
             }
         }

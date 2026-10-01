@@ -23,6 +23,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Supabase is retiring the legacy anon/service_role JWT pair in favor of
+// independently-revocable publishable/secret keys (SUPABASE_PUBLISHABLE_KEYS /
+// SUPABASE_SECRET_KEYS, both JSON-encoded, keyed by key name — "default" here).
+// Reads the new key first; falls back to the legacy env var only if the new one
+// isn't present yet, so this keeps working across the legacy-key disable step.
+function resolveKey(newVarName: string, legacyVarName: string): string {
+  const raw = Deno.env.get(newVarName)
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed.default) return parsed.default
+    } catch { /* fall through to legacy */ }
+  }
+  return Deno.env.get(legacyVarName) ?? ''
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -50,8 +66,8 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const anonKey = resolveKey('SUPABASE_PUBLISHABLE_KEYS', 'SUPABASE_ANON_KEY')
+  const serviceRoleKey = resolveKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY')
 
   // Verify the caller's own session — never trust a client-supplied user id.
   const callerClient = createClient(supabaseUrl, anonKey, {
