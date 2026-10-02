@@ -13,6 +13,12 @@ struct SocialPosterRow: View {
     var friendContext: FriendProfile? = nil
     @ObservedObject var model: VestigoModel
 
+    private func libraryStatusText(for item: MediaItem) -> String {
+        if model.library.isWatched(item.key) { return "Unrated" }
+        if model.library.isInWatchlist(item.key) { return "Watchlist" }
+        return "Unwatched"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -70,7 +76,7 @@ struct SocialPosterRow: View {
                                                     .foregroundStyle(.secondary)
                                             }
                                         } else {
-                                            Text(model.library.isWatched(item.key) ? "Unrated" : "Watchlist")
+                                            Text(libraryStatusText(for: item))
                                                 .font(.caption2)
                                                 .foregroundStyle(.tertiary)
                                         }
