@@ -56,6 +56,13 @@ struct FeaturedPickerSheet: View {
     private func save() {
         let excitedForIDs = Set(model.settings.socialExcitedForKeys)
         model.settings.socialFeaturedItemKeys = selected.filter { !excitedForIDs.contains($0) }
+        let selectedItems = sortedItems.filter { selected.contains($0.key.stableID) }
+        var cache = model.settings.socialFeaturedItemCache
+        for item in selectedItems {
+            cache.removeAll { $0.key == item.key }
+            cache.append(item)
+        }
+        model.settings.socialFeaturedItemCache = cache
         model.saveSettings()
     }
 

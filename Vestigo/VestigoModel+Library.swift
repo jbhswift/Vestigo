@@ -107,16 +107,22 @@ extension VestigoModel {
     }
 
     func isFeatured(_ item: MediaItem) -> Bool {
-        settings.socialFeaturedItemKeys.contains(item.key.stableID)
+        settings.socialFeaturedItemKeys.contains(item.key.stableID) && !settings.socialExcitedForKeys.contains(item.key.stableID)
     }
 
     func toggleFeatured(_ item: MediaItem) {
         let id = item.key.stableID
-        if let idx = settings.socialFeaturedItemKeys.firstIndex(of: id) {
-            settings.socialFeaturedItemKeys.remove(at: idx)
+        let wasFeatured = isFeatured(item)
+        removeExcitedForItemsFromFeatured()
+
+        if wasFeatured {
+            settings.socialFeaturedItemKeys.removeAll { $0 == id }
         } else if settings.socialFeaturedItemKeys.count < SocialProfileLimits.itemLimit {
             settings.socialExcitedForKeys.removeAll { $0 == id }
+            settings.socialFeaturedItemKeys.removeAll { $0 == id }
             settings.socialFeaturedItemKeys.append(id)
+            settings.socialFeaturedItemCache.removeAll { $0.key == item.key }
+            settings.socialFeaturedItemCache.append(item)
         }
         saveSettings()
     }
@@ -127,15 +133,23 @@ extension VestigoModel {
 
     func toggleExcitedFor(_ item: MediaItem) {
         let id = item.key.stableID
-        if let idx = settings.socialExcitedForKeys.firstIndex(of: id) {
-            settings.socialExcitedForKeys.remove(at: idx)
+        removeExcitedForItemsFromFeatured()
+
+        if settings.socialExcitedForKeys.contains(id) {
+            settings.socialExcitedForKeys.removeAll { $0 == id }
         } else if settings.socialExcitedForKeys.count < SocialProfileLimits.itemLimit {
             settings.socialFeaturedItemKeys.removeAll { $0 == id }
+            settings.socialExcitedForKeys.removeAll { $0 == id }
             settings.socialExcitedForKeys.append(id)
             settings.socialExcitedForItemCache.removeAll { $0.key == item.key }
             settings.socialExcitedForItemCache.append(item)
         }
         saveSettings()
+    }
+
+    private func removeExcitedForItemsFromFeatured() {
+        let excitedForIDs = Set(settings.socialExcitedForKeys)
+        settings.socialFeaturedItemKeys.removeAll { excitedForIDs.contains($0) }
     }
 
     func dismissPendingRatingPrompt() {

@@ -60,6 +60,7 @@ struct AppSettings: Codable, Hashable {
     var pickForMeRecentSearches: [PickForMeRecentSearch] = []
     var describeItRecentSearches: [String] = []
     var recentlyViewedItems: [MediaItem] = []
+    var socialFeaturedItemCache: [MediaItem] = []
     var socialExcitedForItemCache: [MediaItem] = []
     var ratingSourceIMDbDefaultApplied: Bool = false
     enum CodingKeys: String, CodingKey {
@@ -120,6 +121,7 @@ struct AppSettings: Codable, Hashable {
         case socialExcitedForKeys
         case analyticsDeviceID
         case recentlyViewedItems
+        case socialFeaturedItemCache
         case socialExcitedForItemCache
         case ratingSourceIMDbDefaultApplied
     }
@@ -213,6 +215,7 @@ struct AppSettings: Codable, Hashable {
         let storedDeviceID = try container.decodeIfPresent(String.self, forKey: .analyticsDeviceID) ?? ""
         analyticsDeviceID = storedDeviceID.isEmpty ? UUID().uuidString : storedDeviceID
         recentlyViewedItems = try container.decodeIfPresent([MediaItem].self, forKey: .recentlyViewedItems) ?? recentlyViewedItems
+        socialFeaturedItemCache = try container.decodeIfPresent([MediaItem].self, forKey: .socialFeaturedItemCache) ?? socialFeaturedItemCache
         socialExcitedForItemCache = try container.decodeIfPresent([MediaItem].self, forKey: .socialExcitedForItemCache) ?? socialExcitedForItemCache
     }
 

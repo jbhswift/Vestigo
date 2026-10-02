@@ -101,7 +101,7 @@ extension VestigoModel {
             ? Array(library.items.values.filter { library.isFavourite($0) && !excitedForKeys.contains($0.key.stableID) }.sorted { $0.voteAverage > $1.voteAverage }.prefix(SocialProfileLimits.itemLimit))
             : settings.socialFeaturedItemKeys.compactMap { k in
                 guard !excitedForKeys.contains(k) else { return nil }
-                return library.items.values.first { $0.key.stableID == k }
+                return library.items.values.first { $0.key.stableID == k } ?? settings.socialFeaturedItemCache.first { $0.key.stableID == k }
             }
         let excitedForItems: [MediaItem] = settings.socialExcitedForKeys.compactMap { k in
             library.items.values.first { $0.key.stableID == k } ?? settings.socialExcitedForItemCache.first { $0.key.stableID == k }

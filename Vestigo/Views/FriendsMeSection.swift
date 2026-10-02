@@ -31,6 +31,7 @@ struct MeSectionView: View {
         return model.settings.socialFeaturedItemKeys.compactMap { stableID in
             guard !excitedForIDs.contains(stableID) else { return nil }
             return model.library.items.values.first { $0.key.stableID == stableID }
+                ?? model.settings.socialFeaturedItemCache.first { $0.key.stableID == stableID }
         }
     }
 
