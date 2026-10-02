@@ -60,7 +60,7 @@ struct SocialPosterRow: View {
                                         .lineLimit(2, reservesSpace: true)
                                         .frame(width: 110, alignment: .topLeading)
                                     if showRating {
-                                        if let rating = model.library.ratings[item.key], rating > 0 {
+                                        if let rating = model.library.rating(for: item.key), rating > 0 {
                                             HStack(spacing: 3) {
                                                 Image(systemName: "star.fill")
                                                     .font(.system(size: 9))

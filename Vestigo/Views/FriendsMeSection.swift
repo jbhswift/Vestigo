@@ -19,16 +19,18 @@ struct MeSectionView: View {
     @State private var nameEdit: String = ""
 
     private var featuredItems: [MediaItem] {
+        let excitedForIDs = Set(model.settings.socialExcitedForKeys)
         if model.settings.socialFeaturedItemKeys.isEmpty {
             return Array(
                 model.library.items.values
-                    .filter { model.library.isFavourite($0) }
+                    .filter { model.library.isFavourite($0) && !excitedForIDs.contains($0.key.stableID) }
                     .sorted { $0.voteAverage > $1.voteAverage }
-                    .prefix(6)
+                    .prefix(SocialProfileLimits.itemLimit)
             )
         }
         return model.settings.socialFeaturedItemKeys.compactMap { stableID in
-            model.library.items.values.first { $0.key.stableID == stableID }
+            guard !excitedForIDs.contains(stableID) else { return nil }
+            return model.library.items.values.first { $0.key.stableID == stableID }
         }
     }
 

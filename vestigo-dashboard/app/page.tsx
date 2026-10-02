@@ -837,6 +837,7 @@ export default function Dashboard() {
             { label: 'Sentry', href: 'https://sentry.io' },
             { label: 'Supabase', href: 'https://supabase.com/dashboard/project/mtttuyvpjyugudkevchj' },
             { label: 'OpenRouter', href: 'https://openrouter.ai/activity' },
+            { label: 'MoTN', href: 'https://developers.movieofthenight.com/' },
             { label: 'Watchmode', href: 'https://api.watchmode.com/' },
             { label: 'TVDB', href: 'https://thetvdb.com/dashboard' },
             { label: 'App Store Connect', href: 'https://appstoreconnect.apple.com' },

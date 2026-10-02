@@ -37,7 +37,7 @@ struct CollectionDetailView: View {
         guard let collection else { return [] }
         return collection.itemKeys.compactMap { model.library.items[$0] }.sorted(
             using: sort,
-            ratings: model.library.ratings,
+            ratings: model.library.visibleRatings,
             externalRatings: model.externalRatingsCache,
             ratingSource: model.settings.preferredRatingSource,
             direction: sortDirection
@@ -56,7 +56,7 @@ struct CollectionDetailView: View {
             }
             .sorted(
                 using: sort,
-                ratings: model.library.ratings,
+                ratings: model.library.visibleRatings,
                 externalRatings: model.externalRatingsCache,
                 ratingSource: model.settings.preferredRatingSource,
                 direction: sortDirection

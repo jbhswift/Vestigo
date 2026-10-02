@@ -84,8 +84,8 @@ enum FranchiseLibrary {
                 && (!settings.hideUpcomingFromCollectionRecommendations || !item.isUpcoming)
             }
             .sorted { lhs, rhs in
-                let lhsScore = recommendationScore(for: lhs, watchedGenreIDs: watchedGenreIDs, favouriteKeys: favouriteKeys, ratings: library.ratings, externalRatings: externalRatings, ratingSource: ratingSource)
-                let rhsScore = recommendationScore(for: rhs, watchedGenreIDs: watchedGenreIDs, favouriteKeys: favouriteKeys, ratings: library.ratings, externalRatings: externalRatings, ratingSource: ratingSource)
+                let lhsScore = recommendationScore(for: lhs, watchedGenreIDs: watchedGenreIDs, favouriteKeys: favouriteKeys, ratings: library.visibleRatings, externalRatings: externalRatings, ratingSource: ratingSource)
+                let rhsScore = recommendationScore(for: rhs, watchedGenreIDs: watchedGenreIDs, favouriteKeys: favouriteKeys, ratings: library.visibleRatings, externalRatings: externalRatings, ratingSource: ratingSource)
 
                 if lhsScore != rhsScore {
                     return lhsScore > rhsScore
@@ -144,8 +144,8 @@ enum FranchiseLibrary {
                 return lhsYear > rhsYear
             }
         case .myRating:
-            let lhsRating = library.ratings[lhs.key] ?? 0
-            let rhsRating = library.ratings[rhs.key] ?? 0
+            let lhsRating = library.rating(for: lhs.key) ?? 0
+            let rhsRating = library.rating(for: rhs.key) ?? 0
             if lhsRating != rhsRating {
                 return lhsRating > rhsRating
             }

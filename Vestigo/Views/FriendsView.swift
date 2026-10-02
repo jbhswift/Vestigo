@@ -199,6 +199,20 @@ struct FriendsView: View {
             EmptyView()
             #endif
         }
+        .alert("Friend Update", isPresented: Binding(
+            get: { model.selectedTab == .friends && model.pendingFriendRemovalNotice != nil },
+            set: { if !$0 { model.clearPendingFriendRemovalNotice() } }
+        )) {
+            Button("OK", role: .cancel) { model.clearPendingFriendRemovalNotice() }
+        } message: {
+            if let notice = model.pendingFriendRemovalNotice {
+                if notice.names.count == 1 {
+                    Text("\(notice.formattedNames) is no longer on your friends list.")
+                } else {
+                    Text("\(notice.formattedNames) are no longer on your friends list.")
+                }
+            }
+        }
     }
 
     private func startFriendsLoad() {

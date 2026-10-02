@@ -10,6 +10,14 @@ struct PendingFriendAdd: Equatable {
     let name: String
 }
 
+struct PendingFriendRemovalNotice: Equatable {
+    let names: [String]
+
+    var formattedNames: String {
+        names.formatted(.list(type: .and))
+    }
+}
+
 @MainActor
 final class VestigoModel: ObservableObject {
     @Published var selectedTab: AppTab = .home {
@@ -99,6 +107,7 @@ final class VestigoModel: ObservableObject {
     @Published var friendsLoading = false
     @Published var friendsDiagnostic: String = ""
     @Published var pendingFriendAdd: PendingFriendAdd? = nil
+    @Published var pendingFriendRemovalNotice: PendingFriendRemovalNotice? = nil
     @Published var userAvatarData: Data? = nil
     @Published var linkLog: [String] = []
     @Published var showSignInWithApple = false

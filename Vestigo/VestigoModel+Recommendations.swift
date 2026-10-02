@@ -23,7 +23,7 @@ extension VestigoModel {
         let lowRatingPenaltyMultiplier = 0.15 + (normalizedStrength * 0.85)
 
         func historyWeight(for historyItem: MediaItem) -> Double {
-            let rating = library.ratings[historyItem.key]
+            let rating = library.rating(for: historyItem.key)
 
             if let rating {
                 let centeredRating = (rating - 2.5) / 2.5
@@ -50,8 +50,8 @@ extension VestigoModel {
         let historyLimit = strength >= 4 ? 10 : 14
         let rankedHistory = watchedHistory
             .sorted { lhs, rhs in
-                let lhsRating = library.ratings[lhs.key] ?? 2.5
-                let rhsRating = library.ratings[rhs.key] ?? 2.5
+                let lhsRating = library.rating(for: lhs.key) ?? 2.5
+                let rhsRating = library.rating(for: rhs.key) ?? 2.5
 
                 if lhsRating != rhsRating {
                     return lhsRating > rhsRating
@@ -167,8 +167,8 @@ extension VestigoModel {
         var favouriteRecommendations: [MediaItem] = []
         let favouriteSeeds = library.favouriteItems
             .sorted { lhs, rhs in
-                let lhsRating = library.ratings[lhs.key] ?? 2.5
-                let rhsRating = library.ratings[rhs.key] ?? 2.5
+                let lhsRating = library.rating(for: lhs.key) ?? 2.5
+                let rhsRating = library.rating(for: rhs.key) ?? 2.5
                 if lhsRating != rhsRating { return lhsRating > rhsRating }
                 return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
             }

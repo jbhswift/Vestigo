@@ -26,7 +26,7 @@ struct WatchlistView: View {
         let hasProviders = !model.settings.subscribedServiceNames.isEmpty
         let sortedItems = model.library.watchlistItems.sorted(
             using: model.sortOption,
-            ratings: model.library.ratings,
+            ratings: model.library.visibleRatings,
             externalRatings: model.externalRatingsCache,
             ratingSource: model.settings.preferredRatingSource,
             direction: model.sortDirection

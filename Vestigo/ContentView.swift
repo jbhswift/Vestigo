@@ -34,6 +34,10 @@ struct ContentView: View {
         )
     }
 
+    private var friendsTabBadge: String? {
+        model.pendingFriendRemovalNotice == nil ? nil : ""
+    }
+
     private func handleShortcut(_ type: String) {
         switch type {
         case "openWatchlist": model.selectTab(.watchlist)
@@ -75,6 +79,7 @@ struct ContentView: View {
                 .tabItem {
                     Label(AppTab.friends.title, systemImage: AppTab.friends.icon)
                 }
+                .badge(friendsTabBadge)
                 .tag(AppTab.friends)
         }
         .tint(model.settings.accentColor)

@@ -19,6 +19,7 @@ extension VestigoModel {
         }
 
         do {
+            let previousFriends = friends
             let friendRows: [SupabaseFriendRow] = try await rpc.callTable("get_my_friends")
             var profiles: [FriendProfile] = []
             for row in friendRows {
@@ -26,9 +27,14 @@ extension VestigoModel {
                     profiles.append(profile)
                 }
             }
+            updatePendingFriendRemovalNotice(previousFriends: previousFriends, currentFriends: profiles)
             friends = profiles
             friendsDiagnostic = ""
-            if !profiles.isEmpty { saveFriendsCache() }
+            if profiles.isEmpty {
+                clearFriendsCache()
+            } else {
+                saveFriendsCache()
+            }
         } catch {
             logLink("loadFriends failed: \(error.localizedDescription)")
             friendsDiagnostic = error.localizedDescription
@@ -151,10 +157,28 @@ extension VestigoModel {
         }
     }
 
+    func clearPendingFriendRemovalNotice() {
+        pendingFriendRemovalNotice = nil
+    }
+
+    private func updatePendingFriendRemovalNotice(previousFriends: [FriendProfile], currentFriends: [FriendProfile]) {
+        let currentFriendIDs = Set(currentFriends.map(\.id))
+        let removedNames = previousFriends
+            .filter { !currentFriendIDs.contains($0.id) }
+            .map(\.name)
+
+        guard !removedNames.isEmpty else { return }
+
+        let existingNames = pendingFriendRemovalNotice?.names ?? []
+        let mergedNames = (existingNames + removedNames).reduce(into: [String]()) { result, name in
+            if !result.contains(name) { result.append(name) }
+        }
+        pendingFriendRemovalNotice = PendingFriendRemovalNotice(names: mergedNames)
+    }
+
     /// Bidirectional removal is enforced server-side by remove_friend() deleting the single
-    /// shared friendships row (see migration 002/009), so there's no separate "removal
-    /// notice" to send; the other side's next get_my_friends()/get_friend_library() call
-    /// simply stops returning this friend/their data, immediately.
+    /// shared friendships row (see migration 002/009), so the other side's next
+    /// get_my_friends()/get_friend_library() call stops returning this friend/their data.
     func removeFriend(friendID: String) {
         friends.removeAll { $0.id == friendID }
         clearFriendsCache()

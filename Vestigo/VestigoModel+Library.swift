@@ -74,7 +74,7 @@ extension VestigoModel {
         guard item.kind == .movie || item.kind == .tv else { return }
 
         pendingRatingPromptItem = item
-        pendingRatingPromptValue = library.ratings[item.key] ?? 0
+        pendingRatingPromptValue = library.rating(for: item.key) ?? 0
         pendingRatingPromptDate = library.watchedDates[item.key]
         pendingRatingPromptMakeFavourite = library.isFavourite(item)
         pendingRatingPromptRestoreWatchlist = restoreWatchlistOnCancel
@@ -114,8 +114,26 @@ extension VestigoModel {
         let id = item.key.stableID
         if let idx = settings.socialFeaturedItemKeys.firstIndex(of: id) {
             settings.socialFeaturedItemKeys.remove(at: idx)
-        } else if settings.socialFeaturedItemKeys.count < 6 {
+        } else if settings.socialFeaturedItemKeys.count < SocialProfileLimits.itemLimit {
+            settings.socialExcitedForKeys.removeAll { $0 == id }
             settings.socialFeaturedItemKeys.append(id)
+        }
+        saveSettings()
+    }
+
+    func isExcitedFor(_ item: MediaItem) -> Bool {
+        settings.socialExcitedForKeys.contains(item.key.stableID)
+    }
+
+    func toggleExcitedFor(_ item: MediaItem) {
+        let id = item.key.stableID
+        if let idx = settings.socialExcitedForKeys.firstIndex(of: id) {
+            settings.socialExcitedForKeys.remove(at: idx)
+        } else if settings.socialExcitedForKeys.count < SocialProfileLimits.itemLimit {
+            settings.socialFeaturedItemKeys.removeAll { $0 == id }
+            settings.socialExcitedForKeys.append(id)
+            settings.socialExcitedForItemCache.removeAll { $0.key == item.key }
+            settings.socialExcitedForItemCache.append(item)
         }
         saveSettings()
     }
@@ -137,7 +155,6 @@ extension VestigoModel {
         guard library.isWatched(item.key) else { return }
 
         library.toggleWatched(item)
-        library.ratings.removeValue(forKey: item.key)
         library.favouriteKeys.remove(item.key)
 
         if pendingRatingPromptRestoreWatchlist {

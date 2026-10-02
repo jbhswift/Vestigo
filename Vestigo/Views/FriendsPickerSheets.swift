@@ -17,7 +17,7 @@ struct FeaturedPickerSheet: View {
     @State private var kindFilter: PickerKind = .both
     @State private var sortedItems: [MediaItem] = []
 
-    private let maxItems = 6
+    private let maxItems = SocialProfileLimits.itemLimit
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
     private func recomputeSortedItems() {
@@ -54,7 +54,8 @@ struct FeaturedPickerSheet: View {
     }
 
     private func save() {
-        model.settings.socialFeaturedItemKeys = Array(selected)
+        let excitedForIDs = Set(model.settings.socialExcitedForKeys)
+        model.settings.socialFeaturedItemKeys = selected.filter { !excitedForIDs.contains($0) }
         model.saveSettings()
     }
 
@@ -136,7 +137,7 @@ struct FeaturedPickerSheet: View {
                                     .lineLimit(1)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 if model.library.isWatched(item.key) {
-                                    if let rating = model.library.ratings[item.key] {
+                                    if let rating = model.library.rating(for: item.key) {
                                         Text("\(rating.formatted(.number.precision(.fractionLength(0...1)))) stars")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
@@ -179,7 +180,8 @@ struct FeaturedPickerSheet: View {
         .presentationBackground(.clear)
         .presentationCornerRadius(54)
         .onAppear {
-            selected = Set(model.settings.socialFeaturedItemKeys)
+            let excitedForIDs = Set(model.settings.socialExcitedForKeys)
+            selected = Set(model.settings.socialFeaturedItemKeys.filter { !excitedForIDs.contains($0) })
             recomputeSortedItems()
         }
         .onDisappear { save() }
@@ -200,10 +202,11 @@ struct ExcitedForPickerSheet: View {
     @State private var remoteTask: Task<Void, Never>? = nil
     @State private var kindFilter: PickerKind = .both
 
-    private let maxItems = 6
+    private let maxItems = SocialProfileLimits.itemLimit
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
     private func save() {
+        model.settings.socialFeaturedItemKeys.removeAll { selected.contains($0) }
         model.settings.socialExcitedForKeys = Array(selected)
         let selectedItems = baseItems.filter { selected.contains($0.key.stableID) }
         var cache = model.settings.socialExcitedForItemCache

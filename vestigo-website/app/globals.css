@@ -134,7 +134,10 @@ nav.tabs {
 
 /* nav.tabs is fixed and doesn't reserve flow space — a static known height
    (rather than JS-measuring it) avoids any layout-shift flash on load. */
-body { padding-top: 76px; }
+/* Pages that render <Nav/> (media, friend) apply this padding themselves via
+   inline style on their <main>, since nav.tabs is fixed and most pages (the
+   root download page) don't show it at all. */
+.has-nav-offset { padding-top: 76px; }
 
 .feature-group { margin: 36px 0; }
 .feature-group h2 {
@@ -386,3 +389,66 @@ p.tagline { font-size: 17px; color: var(--text-secondary); max-width: 480px; mar
   .cast-photo { width: 74px; height: 74px; }
   .invite-card h1 { font-size: 22px; }
 }
+
+/* Moving poster-wall background for the download page. Rows are disjoint
+   slices of the poster pool (see PosterMarquee.tsx), so the same title never
+   appears twice on screen at once, no matter how far the rows have scrolled. */
+.poster-marquee {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  opacity: 0.35;
+  background: #000;
+}
+.poster-marquee-row {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  width: max-content;
+  animation: marquee-left linear infinite;
+}
+.poster-marquee-row.reverse {
+  animation-name: marquee-right;
+}
+.poster-marquee-cell {
+  flex: 0 0 auto;
+  width: 120px;
+  aspect-ratio: 2 / 3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #111;
+}
+.poster-marquee-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+@keyframes marquee-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes marquee-right {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poster-marquee-row { animation: none; }
+}
+
+.download-hero {
+  position: relative;
+  z-index: 1;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 20px;
+  padding: 24px;
+}
+.download-hero .app-icon { width: min(32vw, 140px); }
+.download-hero h1 { font-size: clamp(30px, 6vw, 44px); font-weight: 800; letter-spacing: -0.02em; margin: 0; }

@@ -151,6 +151,16 @@ export async function GET() {
     })
   }
 
+  // ── Movie of the Night / Streaming Availability API ─────────────────────
+  quotas.push({
+    key: 'motn', name: 'MoTN',
+    limit: null, limitUnit: 'calls', period: 'month',
+    used: bestCount('motn'), allTime: null, resetsAt: nextMonthlyReset(),
+    dataSource: 'live',
+    note: 'Streaming Availability API by Movie of the Night. Server-measured (30d).',
+    dashboardUrl: 'https://developers.movieofthenight.com/',
+  })
+
   // ── Watchmode (live via /v1/status/) ────────────────────────────────────
   // unstable_cache is used here because force-dynamic disables Next.js fetch
   // caching, which would otherwise cause a 429 on every dashboard load.

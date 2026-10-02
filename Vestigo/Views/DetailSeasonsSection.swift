@@ -1,6 +1,25 @@
 import SwiftUI
 import Foundation
 
+private struct SeasonWatchProgress {
+    let watchedCount: Int
+    let total: Int
+
+    var buttonTitle: String {
+        if watchedCount == 0 { return "Mark" }
+        if watchedCount == total { return "Watched" }
+        return "\(watchedCount)/\(total)"
+    }
+
+    var isActionable: Bool {
+        watchedCount == 0 || isFullyWatched
+    }
+
+    var isFullyWatched: Bool {
+        total > 0 && watchedCount == total
+    }
+}
+
 struct EpisodeProgressView: View {
     let show: MediaItem
     @ObservedObject var model: VestigoModel
@@ -76,13 +95,14 @@ struct SeasonDropdownView: View {
 
                 Spacer()
 
-                if friendMode == nil && (!hasUnairedEpisodes || isSeasonWatched) {
-                    Button(isSeasonWatched ? "Unwatch" : "Mark") {
+                if friendMode == nil && (!hasUnairedEpisodes || seasonProgress.isFullyWatched) {
+                    Button(seasonProgress.buttonTitle) {
+                        guard seasonProgress.isActionable else { return }
                         model.markSeason(
                             show: show,
                             season: season.number,
-                            episodeCount: max(season.episodeCount, season.episodes.count),
-                            watched: !isSeasonWatched
+                            episodeCount: seasonProgress.total,
+                            watched: !seasonProgress.isFullyWatched
                         )
                     }
                     .font(.caption.bold())
@@ -90,6 +110,7 @@ struct SeasonDropdownView: View {
                     .fixedSize(horizontal: true, vertical: false)
                     .buttonStyle(.bordered)
                     .clipShape(Capsule())
+                    .disabled(!seasonProgress.isActionable)
                 }
 
                 Button(action: toggle) {
@@ -125,11 +146,15 @@ struct SeasonDropdownView: View {
 
     private var isSeasonWatched: Bool {
         if let fm = friendMode { return fm }
+        return seasonProgress.isFullyWatched
+    }
+
+    private var seasonProgress: SeasonWatchProgress {
         let rows = episodeRows
-        guard !rows.isEmpty else { return false }
-        return rows.allSatisfy {
+        let watchedCount = rows.filter {
             model.library.isEpisodeWatched(showKey: show.key, season: season.number, episode: $0.number)
-        }
+        }.count
+        return SeasonWatchProgress(watchedCount: watchedCount, total: rows.count)
     }
 
     private var hasUnairedEpisodes: Bool {

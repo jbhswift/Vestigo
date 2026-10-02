@@ -1,17 +1,21 @@
-import { fetchTMDbList } from "@/lib/tmdb";
-import { HomeContent } from "@/components/HomeContent";
+import { PosterMarquee } from "@/components/PosterMarquee";
 
-export default async function HomePage() {
-  const [trendingRaw, newReleases, upcoming] = await Promise.all([
-    fetchTMDbList("/trending/all/week").catch(() => []),
-    fetchTMDbList("/movie/now_playing", { region: "US" }).catch(() => []),
-    fetchTMDbList("/movie/upcoming", { region: "US" }).catch(() => []),
-  ]);
-  const trending = trendingRaw.filter((item) => item.media_type !== "person");
-
+export default function DownloadPage() {
   return (
-    <main className="wrap" style={{ paddingBottom: 40 }}>
-      <HomeContent trending={trending} newReleases={newReleases} upcoming={upcoming} />
-    </main>
+    <>
+      <PosterMarquee />
+      <main className="download-hero">
+        <img src="/vestigo-app-icon.png" alt="Vestigo app icon" className="app-icon" />
+        <h1>Vestigo</h1>
+        <a
+          className="btn btn-primary"
+          href="https://testflight.apple.com/join/zbvP2WEx"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Download on TestFlight
+        </a>
+      </main>
+    </>
   );
 }

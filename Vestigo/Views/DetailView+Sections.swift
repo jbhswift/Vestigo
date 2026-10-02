@@ -159,7 +159,7 @@ extension DetailView {
                 } else {
                     if model.library.isWatched(item.key) {
                         StarRatingView(rating: Binding(
-                            get: { model.library.ratings[item.key] ?? 0 },
+                            get: { model.library.rating(for: item.key) ?? 0 },
                             set: { model.setRating($0, for: item) }
                         ))
                     } else {
@@ -189,7 +189,7 @@ extension DetailView {
         } else if model.library.isWatched(item.key) {
             HStack(alignment: .center) {
                 StarRatingView(rating: Binding(
-                    get: { model.library.ratings[item.key] ?? 0 },
+                    get: { model.library.rating(for: item.key) ?? 0 },
                     set: { model.setRating($0, for: item) }
                 ))
                 Spacer()
@@ -294,23 +294,26 @@ extension DetailView {
 
     @ViewBuilder var featuredSection: some View {
         if model.friendDetailContext == nil {
-            let featured = model.isFeatured(item)
-            let icon = item.isUpcoming
-                ? (featured ? "bolt.heart.fill" : "bolt.heart")
-                : (featured ? "pin.fill" : "pin")
-            let label = item.isUpcoming
-                ? (featured ? "Excited For" : "Excited For")
-                : (featured ? "Featured" : "Feature")
-            let tint: Color = item.isUpcoming ? .orange : model.settings.accentColor
+            let isUpcoming = item.isUpcoming
+            let selected = isUpcoming ? model.isExcitedFor(item) : model.isFeatured(item)
+            let icon = isUpcoming
+                ? (selected ? "bolt.heart.fill" : "bolt.heart")
+                : (selected ? "pin.fill" : "pin")
+            let label = isUpcoming ? "Excited For" : (selected ? "Featured" : "Feature")
+            let tint: Color = .primary
 
             HStack(spacing: 10) {
                 Button {
-                    model.toggleFeatured(item)
+                    if isUpcoming {
+                        model.toggleExcitedFor(item)
+                    } else {
+                        model.toggleFeatured(item)
+                    }
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: icon)
                             .font(.headline.bold())
-                            .foregroundStyle(featured ? tint : .primary)
+                            .foregroundStyle(selected ? tint : .primary)
 
                         Text(label)
                             .font(.headline.bold())

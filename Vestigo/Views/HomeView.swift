@@ -21,7 +21,7 @@ struct HomeView: View {
         filteredRecommendations(model.library.watchlistItems)
             .sorted(
                 using: .tmdbRating,
-                ratings: model.library.ratings,
+                ratings: model.library.visibleRatings,
                 externalRatings: model.externalRatingsCache,
                 ratingSource: model.settings.preferredRatingSource
             )

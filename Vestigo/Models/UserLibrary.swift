@@ -77,6 +77,14 @@ struct UserLibrary: Codable {
     func isNeverShowAgain(_ key: MediaKey) -> Bool { neverShowAgain.contains(key) }
     func isNotInterested(_ key: MediaKey) -> Bool { notInterested.contains(key) }
 
+    var visibleRatings: [MediaKey: Double] {
+        ratings.filter { watched.contains($0.key) }
+    }
+
+    func rating(for key: MediaKey) -> Double? {
+        watched.contains(key) ? ratings[key] : nil
+    }
+
     mutating func toggleWatchlist(_ item: MediaItem) {
         items[item.key] = item
         if watchlist.contains(item.key) { watchlist.remove(item.key) } else { watchlist.insert(item.key) }

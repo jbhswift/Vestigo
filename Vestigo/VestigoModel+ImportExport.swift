@@ -109,7 +109,7 @@ extension VestigoModel {
             .map { item in
                 WatchedImportEntry.exportLine(
                     for: item,
-                    rating: library.ratings[item.key],
+                    rating: library.rating(for: item.key),
                     isFavourite: library.isFavourite(item)
                 )
             }

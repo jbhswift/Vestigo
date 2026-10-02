@@ -54,6 +54,9 @@ enum VestigoIntentWriter {
     static func rate(entity: VestigoMediaEntity, stars: Double) -> String {
         mutate { library in
             let key = mediaKey(for: entity)
+            guard library.isWatched(key) else {
+                return "Mark \(entity.title) as watched before rating it in Vestigo."
+            }
             library.items[key] = library.items[key] ?? synthesize(entity: entity, key: key)
             let clamped = max(0, min(5, stars))
             library.ratings[key] = clamped

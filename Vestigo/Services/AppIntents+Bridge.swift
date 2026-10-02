@@ -52,7 +52,7 @@ enum VestigoIntentBridge {
 
     static func topRatedItems(kindFilter: VestigoMediaKindFilter, limit: Int = 10) -> [VestigoMediaEntity] {
         guard let library = loadLibrary() else { return [] }
-        return library.ratings
+        return library.visibleRatings
             .filter { $0.value > 0 }
             .compactMap { (key, rating) -> (MediaItem, Double)? in
                 guard let item = library.items[key], matches(kind: item.kind, filter: kindFilter) else { return nil }
@@ -72,7 +72,7 @@ enum VestigoIntentBridge {
         let watched = library.watched.contains(key)
         let onWatchlist = library.watchlist.contains(key)
         let favourite = library.favouriteKeys.contains(key) && watched
-        let rating = library.ratings[key]
+        let rating = library.rating(for: key)
 
         var parts: [String] = []
         if watched {
@@ -109,7 +109,7 @@ enum VestigoIntentBridge {
         let watchedShows  = library.watched.filter { $0.kind == .tv }.count
         let watchlistCount = library.watchlist.count
         let favouritesCount = library.favouriteKeys.filter { library.watched.contains($0) }.count
-        let ratingValues = library.ratings.values.filter { $0 > 0 }
+        let ratingValues = library.visibleRatings.values.filter { $0 > 0 }
         let avgRating = ratingValues.isEmpty ? nil : ratingValues.reduce(0, +) / Double(ratingValues.count)
 
         var parts: [String] = []
@@ -266,7 +266,7 @@ enum VestigoIntentBridge {
             title: item.title,
             kindFilter: filter,
             releaseYear: year,
-            rating: library.ratings[item.key],
+            rating: library.rating(for: item.key),
             isWatched: library.watched.contains(item.key),
             isOnWatchlist: library.watchlist.contains(item.key),
             isFavourite: library.favouriteKeys.contains(item.key) && library.watched.contains(item.key)

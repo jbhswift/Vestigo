@@ -373,7 +373,7 @@ extension VestigoModel {
         let itemGenres = Set(item.genreIDs)
         guard !itemGenres.isEmpty else { return 0 }
 
-        let highlyRatedItems = library.ratings.compactMap { key, rating in
+        let highlyRatedItems = library.visibleRatings.compactMap { key, rating in
             rating >= 4 ? library.items[key] : nil
         }
 

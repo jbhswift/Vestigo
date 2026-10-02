@@ -80,7 +80,7 @@ extension VestigoModel {
 
             var ratingsBySid: [String: Double] = [:]
             for item in sortedWatched + library.watchlistItems {
-                if let r = library.ratings[item.key] { ratingsBySid[item.key.stableID] = r }
+                if let r = library.rating(for: item.key) { ratingsBySid[item.key.stableID] = r }
             }
             await pushCategory("ratings", payload: ratingsBySid)
 
@@ -96,9 +96,13 @@ extension VestigoModel {
     /// backend.
     func pushProfileFields() async {
         guard await supabaseAuth.hasSession else { return }
+        let excitedForKeys = Set(settings.socialExcitedForKeys)
         let featuredItems: [MediaItem] = settings.socialFeaturedItemKeys.isEmpty
-            ? Array(library.items.values.filter { library.isFavourite($0) }.sorted { $0.voteAverage > $1.voteAverage }.prefix(6))
-            : settings.socialFeaturedItemKeys.compactMap { k in library.items.values.first { $0.key.stableID == k } }
+            ? Array(library.items.values.filter { library.isFavourite($0) && !excitedForKeys.contains($0.key.stableID) }.sorted { $0.voteAverage > $1.voteAverage }.prefix(SocialProfileLimits.itemLimit))
+            : settings.socialFeaturedItemKeys.compactMap { k in
+                guard !excitedForKeys.contains(k) else { return nil }
+                return library.items.values.first { $0.key.stableID == k }
+            }
         let excitedForItems: [MediaItem] = settings.socialExcitedForKeys.compactMap { k in
             library.items.values.first { $0.key.stableID == k } ?? settings.socialExcitedForItemCache.first { $0.key.stableID == k }
         }

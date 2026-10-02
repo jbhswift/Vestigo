@@ -176,7 +176,7 @@ function isAllowedTMDbProxyPath(path: string) {
 
   return [
     /^\/trending\/(all|movie|tv)\/(day|week)$/,
-    /^\/movie\/(popular|now_playing|upcoming)$/,
+    /^\/movie\/(popular|now_playing|upcoming|top_rated)$/,
     /^\/tv\/(popular|on_the_air|airing_today)$/,
     /^\/search\/(multi|movie|tv|person)$/,
     /^\/discover\/(movie|tv)$/,

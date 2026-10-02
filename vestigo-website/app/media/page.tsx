@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { fetchTMDbDetail, posterURL, TMDbItem, TMDbProvider, TMDbVideo } from "@/lib/tmdb";
 import { OpenInVestigoButton } from "@/components/OpenInVestigoButton";
 import { MediaCard } from "@/components/MediaCard";
+import { Nav } from "@/components/Nav";
 
 interface PageProps {
   searchParams: Promise<{ id?: string; kind?: string }>;
@@ -70,12 +71,15 @@ export default async function MediaPage({ searchParams }: PageProps) {
 
   if (!id || !/^\d+$/.test(id)) {
     return (
-      <main className="wrap detail-page">
-        <div className="open-app-bar">
-          <OpenInVestigoButton deepLink={deepLink} />
-        </div>
-        <h1>Vestigo</h1>
-      </main>
+      <>
+        <Nav />
+        <main className="wrap detail-page has-nav-offset">
+          <div className="open-app-bar">
+            <OpenInVestigoButton deepLink={deepLink} />
+          </div>
+          <h1>Vestigo</h1>
+        </main>
+      </>
     );
   }
 
@@ -84,12 +88,15 @@ export default async function MediaPage({ searchParams }: PageProps) {
     data = await loadDetail(id, kind);
   } catch {
     return (
-      <main className="wrap detail-page">
-        <div className="open-app-bar">
-          <OpenInVestigoButton deepLink={deepLink} />
-        </div>
-        <h1>Check this out on Vestigo</h1>
-      </main>
+      <>
+        <Nav />
+        <main className="wrap detail-page has-nav-offset">
+          <div className="open-app-bar">
+            <OpenInVestigoButton deepLink={deepLink} />
+          </div>
+          <h1>Check this out on Vestigo</h1>
+        </main>
+      </>
     );
   }
 
@@ -134,12 +141,14 @@ export default async function MediaPage({ searchParams }: PageProps) {
     .slice(0, 12);
 
   return (
-    <main className="wrap detail-page">
-      <div className="open-app-bar">
-        <OpenInVestigoButton deepLink={deepLink} />
-      </div>
+    <>
+      <Nav />
+      <main className="wrap detail-page has-nav-offset">
+        <div className="open-app-bar">
+          <OpenInVestigoButton deepLink={deepLink} />
+        </div>
 
-      <div className="detail-header">
+        <div className="detail-header">
         <div className="detail-poster">{poster && <img src={poster} alt={title} />}</div>
         <div className="detail-info">
           <h1>{title}</h1>
@@ -219,6 +228,7 @@ export default async function MediaPage({ searchParams }: PageProps) {
           </div>
         </div>
       )}
-    </main>
+      </main>
+    </>
   );
 }

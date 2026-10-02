@@ -2,6 +2,10 @@ import Foundation
 
 // MARK: - Helpers
 
+enum SocialProfileLimits {
+    static let itemLimit = 6
+}
+
 enum DynamicCollections {
     static func inferredSeriesNames(for item: MediaItem) -> [String] { [] }
 

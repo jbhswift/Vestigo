@@ -126,4 +126,34 @@ final class VestigoTests: XCTestCase {
         XCTAssertEqual(decoded.socialConfirmedFriendIDs, ["vp-friend1"])
         XCTAssertEqual(decoded.socialProcessedRequestIDs, ["vfr-req-1", "vfr-req-2"])
     }
+
+    // MARK: - Library ratings
+
+    func testRatingsAreOnlyVisibleForWatchedItems() {
+        let item = MediaItem(
+            id: 42,
+            kind: .movie,
+            title: "Test Movie",
+            overview: "",
+            posterPath: nil,
+            backdropPath: nil,
+            releaseDate: "2026-01-01",
+            voteAverage: 7,
+            genreIDs: [],
+            creditRole: nil,
+            runtime: nil,
+            originalLanguage: "en"
+        )
+        var library = UserLibrary()
+        library.items[item.key] = item
+        library.ratings[item.key] = 4.5
+
+        XCTAssertNil(library.rating(for: item.key))
+        XCTAssertTrue(library.visibleRatings.isEmpty)
+
+        library.markWatched(item)
+
+        XCTAssertEqual(library.rating(for: item.key), 4.5)
+        XCTAssertEqual(library.visibleRatings[item.key], 4.5)
+    }
 }
